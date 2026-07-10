@@ -1,0 +1,38 @@
+services:
+  moonfall-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: moonfall-runtime:back-end
+    container_name: moonfall-runtime
+    environment:
+      RUNTIME_HOST: 0.0.0.0
+      RUNTIME_PORT: 8000
+      SQLITE_DB_PATH: /data/moonfall.db
+      LLM_PROVIDER: deepseek
+      DEEPSEEK_BASE_URL: https://api.deepseek.com
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      NVIDIA_BASE_URL: ${NVIDIA_BASE_URL:-http://localhost:8000/v1}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      NVIDIA_MODEL: ${NVIDIA_MODEL:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - moonfall-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).read()"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  moonfall-data:

@@ -8,6 +8,22 @@ This branch implements the MVP IR contract from `前后端对接文档 · Moonfa
 - Local WebSocket: `ws://127.0.0.1:8000/ws`
 - LAN use: replace `127.0.0.1` with the backend machine IPv4 address.
 
+## Docker Unified Environment
+
+The `back-end` branch includes a Docker runtime:
+
+```bash
+docker compose up --build
+```
+
+After startup:
+
+- REST: `http://127.0.0.1:8000/api`
+- WebSocket: `ws://127.0.0.1:8000/ws`
+- Health: `http://127.0.0.1:8000/api/health`
+
+See `docs/docker.md` for environment variables, volume behavior, and shutdown commands.
+
 ## WebSocket Envelope
 
 All WebSocket messages use one envelope:
