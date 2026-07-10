@@ -22,7 +22,6 @@
     { "id": "declaring_launch", "scope": "faction", "initial": 0, "min": 0, "max": 1, "note": "持久 flag：已宣布点火、等待判定（由 declare_launch 事件置 1）" },
     { "id": "launched",  "scope": "faction", "initial": 0, "min": 0, "max": 1, "note": "是否已成功升空并锁定排名" },
     { "id": "crashed",   "scope": "faction", "initial": 0, "min": 0, "max": 1, "note": "持久 flag：飞船 HP 归零坠毁" },
-    { "id": "robot_hp",  "scope": "unit",    "initial": 3, "min": 0, "max": 3, "note": "小机器人 HP" },
     { "id": "moon_rage", "scope": "global",  "initial": 0, "min": 0, "max": 100, "note": "月球狂暴度 0-100，四档" }
   ],
 
@@ -166,9 +165,6 @@
     { "id": "dust_damage", "for_each": "rover",
       "when": "in_zone(self, dust_area)",
       "then": [ { "adjust": { "faction.of_self.ship_hp": -1 } } ] },
-    { "id": "dust_lingering", "for_each": "rover",
-      "when": "in_zone(self, dust_area) for 3s",
-      "then": [ { "adjust": { "unit.self.robot_hp": -1 } } ] },
 
     { "id": "ignition_success", "for_each": "faction",
       "when": "self.fuel >= 5 and self.ship_hp > 0 and self.jammed == 0 and self.declaring_launch == 1 and in_zone(self_rover, self_ship)",

@@ -49,7 +49,7 @@ MVP 规则文档的每条机制，对应配置中的位置。Review 从这张表
 | 机器人 6 种自主行为 | `units[].behaviors`，行为库目录见 §5 | 权重 |
 | 卡牌影响行为倾向 | `inputs.cards.deck` 的 `boost` | 见 §2.9 |
 | 攻击敌船 -1 HP、攻击领先者额外效果 | 卡 `moonrock_strike`、`fuel_raid` 的 `on_hit` | -1 |
-| 月尘进入船受伤、停留超 3 秒机器人 -1 | `director.events.dust_storm`，`rules.dust_damage`、`dust_lingering`，`tuning.dust_linger_sec` | 3s |
+| 月尘进入船受伤 | `director.events.dust_storm`，`rules.dust_damage` | -1 |
 | 陨石格不可通行 | `director.events.meteor_fall`，zone `meteor_area` | — |
 | 发射干扰点火失败、需回船清除 | `director.events.launch_jam`，`vars.jammed`，`rules.ignition_success` | — |
 | 狂暴度 0-100 四档 | `vars.moon_rage`，`director.events` 的 when 阈值，`tuning` rage_* | 30/60/80 |
@@ -113,7 +113,8 @@ vars:
   - { id: fuel,      scope: faction, initial: 0, min: 0, max: 5 }
   - { id: ship_hp,   scope: faction, initial: 3, min: 0, max: 3 }
   - { id: moon_rage, scope: global,  initial: 0, min: 0, max: 100 }
-  - { id: robot_hp,  scope: unit,    initial: 3, min: 0, max: 3 }
+  # 可选血量玩法才声明单位血量，默认 MVP 不含：
+  # - { id: robot_hp, scope: unit, initial: 3, min: 0, max: 3 }
 ```
 
 | 字段 | 说明 |
@@ -123,7 +124,7 @@ vars:
 | `scope: unit` | 每单位一份，引用写 `unit.<id>.robot_hp` |
 | `initial / min / max` | 初值与上下界，引擎钳制在界内 |
 
-MVP 中 fuel 与 ship_hp 都是 `scope: faction`，各船独立。moon_rage 是 `scope: global`，全场共享。这层同时决定了 PVE 与 FFA 的资源归属。
+MVP 中 fuel 与 ship_hp 都是 `scope: faction`，各船独立。moon_rage 是 `scope: global`，全场共享。这层同时决定了 PVE 与 FFA 的资源归属。机器人血量为可选玩法，默认 MVP 不含。要启用带血量的变体，只需声明 `robot_hp` 变量与相应规则，引擎不改。
 
 ### 2.4 map
 
@@ -395,7 +396,7 @@ tuning:
 
 1. 升空链。`vars.fuel` 上限 5，`rules.ignition_success` 的四个 when 条件，行为 `ignition_confirm`，卡 `ignition_protocol` 是否齐全、数值正确。
 2. 收益数值。`tuning` 的 normal_resource_yield 1、central_yield 2、airdrop_yield 1 与规则一致否，初始库存 `*_stock` 呢。
-3. 伤害来源。敌方攻击 `on_hit`、月尘 `dust_damage` 与 `dust_lingering`、干扰 `jammed` 三条路径是否都建模。
+3. 伤害来源。敌方攻击 `on_hit`、月尘 `dust_damage`、干扰 `jammed` 三条路径是否都建模。机器人血量为可选玩法，不在默认清单内。
 4. 狂暴度四档。`director.events` 各 when 的 30/60/80 与 `tuning.rage_*` 对齐否，沉睡档投小燃料、终局档优先干扰点火者是否有对应事件。
 5. 六个机械臂技能。技能 1 至 4 在 `director.events`，技能 5、6 在 `rules` 的 `trigger_actuator`，逐个核对触发条件与效果。
 6. 联盟与背叛。`relationships` 能改成 friendly 否，背叛 +10 狂暴的 `rules.betrayal_penalty` 在否。

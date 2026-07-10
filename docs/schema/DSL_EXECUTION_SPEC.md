@@ -108,7 +108,7 @@ flowchart LR
 规范化后，两条规则的写法：
 
 ```yaml
-# 月尘持续伤害，对每台机器人检查
+# 月尘持续伤害，对每台机器人检查（可选血量玩法，默认 MVP 不含，此处示意 for Ns 与 for_each）
 - id: dust_lingering
   for_each: rover
   when: "in_zone(self, dust_area) for 3s"
