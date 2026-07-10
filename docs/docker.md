@@ -2,6 +2,9 @@
 
 This file describes the local Docker environment for the `back-end` branch.
 
+For the full deployment environment, including local Python mode, network notes,
+environment variables, and verification steps, see `docs/deployment_environment.md`.
+
 ## Files
 
 | File | Purpose |

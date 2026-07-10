@@ -23,6 +23,7 @@ After startup:
 - Health: `http://127.0.0.1:8000/api/health`
 
 See `docs/docker.md` for environment variables, volume behavior, and shutdown commands.
+See `docs/deployment_environment.md` for the full project deployment environment.
 
 ## WebSocket Envelope
 
