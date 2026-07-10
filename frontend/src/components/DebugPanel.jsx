@@ -11,10 +11,10 @@ const post = (path, body) =>
 export default function DebugPanel({ state, status }) {
   const live = status === 'live'
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[600px] bg-black/85 border border-glacier/40 rounded-lg p-4 text-xs">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-glacier font-bold tracking-widest">DEBUG · Ctrl+D</span>
-        <span className="text-white/40">{live ? '● LIVE' : '○ MOCK（按钮仅在连后端时生效）'}</span>
+    <div className="absolute bottom-[120px] left-1/2 -translate-x-1/2 z-50 w-[560px] panel-strong p-3 text-xs">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-mono tracking-widest text-cyan">DEBUG · Ctrl+D</span>
+        <span className="text-muted text-[10px]">{live ? '● LIVE' : '○ MOCK（按钮仅在连后端时生效）'}</span>
       </div>
       <div className="flex flex-wrap gap-2">
         <button
@@ -39,7 +39,7 @@ export default function DebugPanel({ state, status }) {
           Reset
         </button>
       </div>
-      <pre className="mt-3 max-h-40 overflow-auto text-[10px] text-white/50">
+      <pre className="mt-2 max-h-32 overflow-auto text-[9px] text-muted/60 font-mono">
         {JSON.stringify({ phase: state?.phase, turn: state?.turn, global: state?.global }, null, 2)}
       </pre>
     </div>

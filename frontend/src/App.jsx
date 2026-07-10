@@ -1,33 +1,21 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useGameData } from './lib/useGameData'
 import Scene3D from './components/Scene3D'
-import PlayerPanel from './components/PlayerPanel'
-import MoonRageMeter from './components/MoonRageMeter'
-import EventLog from './components/EventLog'
-import RankBoard from './components/RankBoard'
+import TopBar from './components/TopBar'
+import MissionPanel from './components/MissionPanel'
+import PlayerBar from './components/PlayerBar'
+import EventTimeline from './components/EventTimeline'
 import DangerOverlay from './components/DangerOverlay'
 import DebugPanel from './components/DebugPanel'
 import LoadingScreen from './components/LoadingScreen'
 
-function StatusPill({ status }) {
-  const map = {
-    live: { c: '#2ecc71', t: '● LIVE' },
-    mock: { c: '#f39c12', t: '○ MOCK 演示' },
-    connecting: { c: '#00f2ff', t: '… 连接中' },
-  }
-  const s = map[status] || map.connecting
-  return (
-    <div className="absolute top-4 left-6 z-40 text-[11px] tracking-widest" style={{ color: s.c }}>
-      {s.t}
-    </div>
-  )
-}
-
 export default function App() {
   const { config, state, events, status } = useGameData()
   const [showDebug, setShowDebug] = useState(false)
+  const [showHint, setShowHint] = useState(true)
 
+  // Ctrl+D 调试
   useEffect(() => {
     const onKey = (e) => {
       if (e.ctrlKey && (e.key === 'd' || e.key === 'D')) {
@@ -39,72 +27,89 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // 操作提示 3 秒后自动淡出
+  useEffect(() => {
+    const timer = setTimeout(() => setShowHint(false), 3000)
+    return () => clearTimeout(timer)
+  }, [])
+
   if (!state || !config) {
-    return (
-      <div data-theme="lunar">
-        <LoadingScreen status={status} />
-      </div>
-    )
+    return <LoadingScreen status={status} />
   }
 
   const isEndgame = state.global?.moon_tier === 'endgame'
   const factions = state.factions || []
-  const unitOf = (fid) => (state.units || []).find((u) => u.faction === fid)
+  const units = state.units || []
+  const unitOf = (fid) => units.find((u) => u.faction === fid)
+
+  // 心率压力贡献
+  const stressValues = factions.map((f) => Math.max(0, (f.vars?.heart_rate || 0) - 60))
+  const totalStress = stressValues.reduce((s, v) => s + v, 0) || 1
+  const stressPctOf = (i) => Math.round((stressValues[i] / totalStress) * 100)
 
   return (
     <div
-      data-theme="lunar"
-      className={`relative w-screen h-screen overflow-hidden scanlines ${isEndgame ? 'animate-pulse-red' : ''}`}
-      style={{ background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-body)' }}
+      className={`relative w-screen h-screen overflow-hidden flex flex-col ${isEndgame ? 'scanlines-endgame' : ''}`}
+      style={{ background: '#090B0C', color: '#E7E1D6', fontFamily: 'IBM Plex Mono, monospace' }}
     >
-      {/* 3D 月面场景（可拖拽旋转 / 滚轮缩放 / 点击聚焦） */}
-      <Scene3D config={config} state={state} lastEvent={events[0]} />
+      {/* 顶部栏 */}
+      <TopBar
+        rage={state.global?.moon_rage ?? 0}
+        tier={state.global?.moon_tier}
+        phase={state.phase}
+        turn={state.turn}
+        status={status}
+        factions={factions}
+      />
 
-      <StatusPill status={status} />
+      {/* 主体区域：左任务 | 中地图 | 右事件 */}
+      <div className="flex flex-1 min-h-0">
+        <div className="w-[220px] flex-shrink-0 p-2">
+          <MissionPanel state={state} config={config} />
+        </div>
 
-      {/* 四角玩家面板 */}
-      <div className="absolute inset-0 p-5 pointer-events-none z-20">
-        <div className="flex flex-col justify-between h-full">
-          <div className="flex justify-between items-start">
-            <PlayerPanel faction={factions[0]} config={config} unit={unitOf(factions[0]?.id)} corner="top-left" />
-            <PlayerPanel faction={factions[1]} config={config} unit={unitOf(factions[1]?.id)} corner="top-right" />
-          </div>
-          <div className="flex justify-between items-end">
-            <PlayerPanel faction={factions[2]} config={config} unit={unitOf(factions[2]?.id)} corner="bottom-left" />
-            <PlayerPanel faction={factions[3]} config={config} unit={unitOf(factions[3]?.id)} corner="bottom-right" />
-          </div>
+        <div className="flex-1 relative min-w-0">
+          <Scene3D config={config} state={state} lastEvent={events[0]} debug={showDebug} />
+        </div>
+
+        <div className="w-[260px] flex-shrink-0 p-2">
+          <EventTimeline events={events} />
         </div>
       </div>
 
-      {/* 月球狂暴度 - 顶部居中 */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[34%] max-w-[520px] z-20 pointer-events-none">
-        <MoonRageMeter
-          rage={state.global?.moon_rage ?? 0}
-          tier={state.global?.moon_tier}
-          phase={state.phase}
-          turn={state.turn}
-        />
+      {/* 底部 4 玩家状态条 */}
+      <div className="h-[100px] flex-shrink-0 px-2 pb-2">
+        <div className="grid grid-cols-4 gap-2 h-full">
+          {factions.map((f, i) => (
+            <PlayerBar
+              key={f.id}
+              faction={f}
+              config={config}
+              unit={unitOf(f.id)}
+              stressPct={stressPctOf(i)}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* 排名结算 - 左侧中部 */}
-      <div className="absolute left-6 top-[40%] w-44 z-20 pointer-events-none">
-        <RankBoard factions={factions} config={config} />
-      </div>
+      {/* 操作提示：3 秒后自动淡出 */}
+      <AnimatePresence>
+        {showHint && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute bottom-1 left-1/2 -translate-x-1/2 z-20 text-[7px] tracking-widest text-muted/30 pointer-events-none font-mono"
+          >
+            拖拽旋转 · 滚轮缩放 · 点击聚焦
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* 事件流 - 右侧中部 */}
-      <div className="absolute right-6 top-[36%] w-72 h-[30%] z-20 pointer-events-none">
-        <EventLog events={events} />
-      </div>
-
-      {/* 操作提示 */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 text-[10px] tracking-widest muted pointer-events-none">
-        拖拽旋转 · 滚轮缩放 · 点击建筑聚焦 · Ctrl+D 调试
-      </div>
-
-      {/* 终局预警 */}
+      {/* 终局遮罩 */}
       <AnimatePresence>{isEndgame && <DangerOverlay />}</AnimatePresence>
 
-      {/* 调试面板 Ctrl+D */}
+      {/* 调试面板（Ctrl+D 触发，不展示给观众） */}
       {showDebug && <DebugPanel state={state} status={status} />}
     </div>
   )

@@ -1,21 +1,37 @@
 import { motion } from 'framer-motion'
 
+// 克制的终局遮罩：屏幕边缘暗角 + 顶部细条警告
+// 不再使用巨大的 ENDGAME 文字
 export default function DangerOverlay() {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="absolute inset-0 pointer-events-none z-40"
-    >
-      <div className="absolute inset-0 border-[6px] border-lava/60 animate-pulse" />
+    <>
+      {/* 屏幕边缘暗红色暗角 */}
       <motion.div
-        className="absolute top-24 left-1/2 -translate-x-1/2 text-lava font-black text-2xl tracking-[0.4em] whitespace-nowrap"
-        animate={{ opacity: [0.4, 1, 0.4] }}
-        transition={{ duration: 1.2, repeat: Infinity }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 pointer-events-none z-40"
+        style={{
+          boxShadow: 'inset 0 0 200px rgba(240, 82, 61, 0.15)',
+        }}
+      />
+
+      {/* 顶部细条警告 */}
+      <motion.div
+        initial={{ y: -30, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: -30, opacity: 0 }}
+        className="absolute top-[60px] left-1/2 -translate-x-1/2 z-40 pointer-events-none"
       >
-        ⚠ ENDGAME · 终局狂暴 ⚠
+        <div className="flex items-center gap-2 px-4 py-1 danger-bar">
+          <span className="text-[10px] font-mono font-semibold tracking-wider" style={{ color: '#FF2F2F' }}>
+            ⚠ ENDGAME
+          </span>
+          <span className="text-[10px] font-sc" style={{ color: 'rgba(255, 47, 47, 0.7)' }}>
+            机械臂已解除攻击限制
+          </span>
+        </div>
       </motion.div>
-    </motion.div>
+    </>
   )
 }

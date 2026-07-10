@@ -4,10 +4,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { FACTION_COLORS } from '../lib/factions'
 
@@ -92,6 +88,7 @@ export default class MoonScene {
     this.rovers = {} // unit id -> rover group
     this.ships = {} // faction id -> ship node（发射动画用）
     this.fx = [] // 活跃特效
+    this.armFx = [] // 机械臂锁定/攻击预测
     this.prevVars = {} // faction id -> vars（diff 检测发射/坠毁）
     this.rageTier = 'sleep'
     this.rage = 0
@@ -110,7 +107,8 @@ export default class MoonScene {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
     this.renderer.setSize(w, h)
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    // 高面数 GLB + 高 DPI 会显著增加帧缓冲压力。
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05
     container.appendChild(this.renderer.domElement)
@@ -118,6 +116,7 @@ export default class MoonScene {
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color(0x05070c)
     this.scene.fog = new THREE.FogExp2(0x0a0e16, 0.014)
+    this.engineDustTexture = glowSpriteTexture('rgba(255,190,120,1)')
     // 关键：PBR 金属材质必须有环境贴图，否则反射为纯黑
     // 用 envMapIntensity 在材质级别加强环境光
     const pmrem = new THREE.PMREMGenerator(this.renderer)
@@ -125,7 +124,8 @@ export default class MoonScene {
     pmrem.dispose()
 
     this.camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 300)
-    this.camera.position.set(13, 11, 13)
+    // 导播视角：约 60° 俯视，保证四角飞船和中央目标同时可见。
+    this.camera.position.set(7, 17, 7)
 
     this.renderer.domElement.style.touchAction = 'none' // 触屏/触控板双指捏合缩放交给 OrbitControls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
@@ -139,13 +139,6 @@ export default class MoonScene {
     this.controls.maxPolarAngle = Math.PI * 0.47
     this.controls.addEventListener('start', () => (this.controls.autoRotate = false))
 
-    // 泛光后期
-    this.composer = new EffectComposer(this.renderer)
-    this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.75, 0.55, 0.82)
-    this.composer.addPass(this.bloom)
-    this.composer.addPass(new OutputPass())
-
     this._buildLights()
     this._buildTerrain()
     this._buildSky()
@@ -158,7 +151,6 @@ export default class MoonScene {
       this.camera.aspect = W / H
       this.camera.updateProjectionMatrix()
       this.renderer.setSize(W, H)
-      this.composer.setSize(W, H)
     }
     window.addEventListener('resize', this._onResize)
 
@@ -225,32 +217,79 @@ export default class MoonScene {
     this.ground.rotation.x = -Math.PI / 2
     this.scene.add(this.ground)
 
-    // 棋盘霓虹网格
-    const gpts = []
+    // 四角切角的月面工程平台。挤出方向向下，上表面保持在 y=0。
+    const half = GRID / 2 + 0.22
+    const cut = 1.42
+    const platformShape = new THREE.Shape()
+    platformShape.moveTo(-half + cut, -half)
+    platformShape.lineTo(half - cut, -half)
+    platformShape.lineTo(half, -half + cut)
+    platformShape.lineTo(half, half - cut)
+    platformShape.lineTo(half - cut, half)
+    platformShape.lineTo(-half + cut, half)
+    platformShape.lineTo(-half, half - cut)
+    platformShape.lineTo(-half, -half + cut)
+    platformShape.closePath()
+
+    const deck = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(platformShape, { depth: 0.28, bevelEnabled: true, bevelSegments: 2, bevelSize: 0.07, bevelThickness: 0.05 }),
+      new THREE.MeshStandardMaterial({ color: 0x252b2e, metalness: 0.5, roughness: 0.7, envMapIntensity: 0.7 })
+    )
+    deck.rotation.x = Math.PI / 2
+    deck.position.y = -0.06
+    this.scene.add(deck)
+
+    const inset = new THREE.Mesh(
+      new THREE.ShapeGeometry(platformShape),
+      new THREE.MeshStandardMaterial({ color: 0x4a5052, roughness: 0.93, metalness: 0.08 })
+    )
+    inset.rotation.x = -Math.PI / 2
+    inset.position.y = 0.018
+    this.scene.add(inset)
+
+    // 定位线降级为工业板缝：小格极弱，每 3 格一条主结构线。
+    const minorPts = []
+    const majorPts = []
     for (let i = 0; i <= GRID; i++) {
       const v = i - GRID / 2
-      gpts.push(-GRID / 2, 0, v, GRID / 2, 0, v)
-      gpts.push(v, 0, -GRID / 2, v, 0, GRID / 2)
+      const limit = Math.abs(v) > GRID / 2 - cut ? half - (Math.abs(v) - (half - cut)) : GRID / 2
+      const target = i % 3 === 0 ? majorPts : minorPts
+      target.push(-limit, 0, v, limit, 0, v)
+      target.push(v, 0, -limit, v, 0, limit)
     }
-    const ggeo = new THREE.BufferGeometry()
-    ggeo.setAttribute('position', new THREE.Float32BufferAttribute(gpts, 3))
+    const minorGeo = new THREE.BufferGeometry()
+    minorGeo.setAttribute('position', new THREE.Float32BufferAttribute(minorPts, 3))
     this.gridLines = new THREE.LineSegments(
-      ggeo,
-      new THREE.LineBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false })
+      minorGeo,
+      new THREE.LineBasicMaterial({ color: 0x8a9293, transparent: true, opacity: 0.11, depthWrite: false })
     )
-    this.gridLines.position.y = 0.02
+    this.gridLines.position.y = 0.035
     this.scene.add(this.gridLines)
 
-    // 棋盘外框（亮一档，吃泛光）
-    // 方形环：4 段 RingGeometry 的“半径”是角点距离，边距 = r·cos45°
-    const br = (GRID / 2 + 0.18) / Math.cos(Math.PI / 4)
-    const border = new THREE.Mesh(
-      new THREE.RingGeometry(br, br + 0.26, 4, 1, Math.PI / 4),
-      new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })
+    const majorGeo = new THREE.BufferGeometry()
+    majorGeo.setAttribute('position', new THREE.Float32BufferAttribute(majorPts, 3))
+    const majorLines = new THREE.LineSegments(
+      majorGeo,
+      new THREE.LineBasicMaterial({ color: 0x9aa2a3, transparent: true, opacity: 0.25, depthWrite: false })
     )
-    border.rotation.x = -Math.PI / 2
-    border.position.y = 0.03
-    this.scene.add(border)
+    majorLines.position.y = 0.038
+    this.scene.add(majorLines)
+
+    // 边缘只保留短段状态灯，不再使用完整青色 AR 外框。
+    const edgeLights = new THREE.Group()
+    const lightMat = new THREE.MeshBasicMaterial({ color: 0x69c9c7, transparent: true, opacity: 0.55 })
+    ;[-3.8, 0, 3.8].forEach((v) => {
+      ;[-1, 1].forEach((side) => {
+        const horizontal = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.035, 0.07), lightMat)
+        horizontal.position.set(v, 0.055, side * (half - 0.08))
+        edgeLights.add(horizontal)
+        const vertical = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.035, 1.25), lightMat)
+        vertical.position.set(side * (half - 0.08), 0.055, v)
+        edgeLights.add(vertical)
+      })
+    })
+    this.edgeLights = edgeLights
+    this.scene.add(edgeLights)
   }
 
   _buildSky() {
@@ -327,11 +366,24 @@ export default class MoonScene {
   }
 
   // ---------- 模型 ----------
-  // GLB 模型加载已禁用，所有 zone 使用占位 box。
-  // 原因：GLB 模型渲染时会导致画面出现大黑块，待定位后恢复。
-  _loadModels() {
-    this.onProgress(100)
-    this._modelsReady()
+  // 所有 GLB 顺序加载；单个资源失败时，对应区域自动使用占位体。
+  async _loadModels() {
+    const names = [...new Set(Object.values(MODELS))]
+    const loader = new GLTFLoader()
+
+    // 顺序加载，避免多个大模型同时抢占网络和解析资源。
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i]
+      try {
+        const gltf = await loader.loadAsync(`/assets/models/${name}.glb`)
+        this.models[name] = gltf.scene
+      } catch (error) {
+        console.error(`Failed to load ${name}.glb; using placeholder instead.`, error)
+      }
+      this.onProgress(Math.round(((i + 1) / names.length) * 100))
+    }
+
+    if (!this._disposed) this._modelsReady()
   }
 
   _modelsReady() {
@@ -400,6 +452,9 @@ export default class MoonScene {
     const shipOrder = ['ship_a', 'ship_b', 'ship_c', 'ship_d']
 
     zones.forEach((z) => {
+      // 干扰区没有对应 GLB，不在 3D 场景中生成程序化占位物。
+      if (z.kind === 'trap') return
+
       const [gx, gy] = z.center
       const wx = gx2w(gx)
       const wz = gy2w(gy)
@@ -413,6 +468,25 @@ export default class MoonScene {
         const idx = shipOrder.indexOf(z.id)
         const fid = factions[idx >= 0 ? idx : 0]?.id
         color = new THREE.Color(FACTION_COLORS[fid] || '#00f2ff').getHex()
+
+        // 四角玩家区改为边缘工业泊位，颜色只出现在短灯条上。
+        const outward = new THREE.Vector2(wx, wz).normalize()
+        const dock = new THREE.Mesh(
+          new THREE.BoxGeometry(2.05, 0.075, 1.28),
+          new THREE.MeshStandardMaterial({ color: 0x3a4144, metalness: 0.42, roughness: 0.78 })
+        )
+        dock.rotation.y = Math.atan2(outward.x, outward.y) + Math.PI / 2
+        dock.position.y = 0.045
+        group.add(dock)
+
+        const dockLight = new THREE.Mesh(
+          new THREE.BoxGeometry(0.92, 0.035, 0.07),
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.72 })
+        )
+        dockLight.rotation.y = dock.rotation.y
+        dockLight.position.set(outward.x * 0.55, 0.095, outward.y * 0.55)
+        group.add(dockLight)
+
         const ship = this._spawn(MODELS[z.id] || 'ship1', 2.1, MODELS[z.id] === 'ship1' ? FACTION_COLORS[fid] : null)
         group.add(ship)
         if (fid) this.ships[fid] = { node: ship, group, state: 'idle', t: 0 }
@@ -432,25 +506,33 @@ export default class MoonScene {
         m.rotation.y = Math.PI / 3
         group.add(m)
         this.meteorNode = m
-      } else if (z.kind === 'trap') {
-        this.jammer.position.set(wx, 0, wz)
-        this.jammer.visible = true
-        this.jammer.userData.zoneId = z.id
       }
 
-      // 地面光环 + 名牌
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(0.55, 0.72, 48),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })
-      )
-      ring.rotation.x = -Math.PI / 2
-      ring.position.y = 0.04
-      group.add(ring)
-      this.zoneRings[z.id] = ring
+      // 功能区保留克制的嵌入式定位环；玩家区已使用泊位灯条。
+      if (z.kind !== 'base') {
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(0.55, 0.68, 32),
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })
+        )
+        ring.rotation.x = -Math.PI / 2
+        ring.position.y = 0.055
+        group.add(ring)
+        this.zoneRings[z.id] = ring
+      }
 
-      const label = labelSprite(z.name || z.id, '#' + new THREE.Color(color).getHexString())
-      label.position.y = z.kind === 'base' ? 3.1 : 2.6
-      group.add(label)
+      // 常驻标签只保留四个玩家和中央核心，避免遮挡模型。
+      let labelText = null
+      if (z.kind === 'base') {
+        const idx = shipOrder.indexOf(z.id)
+        labelText = factions[idx >= 0 ? idx : 0]?.id?.toUpperCase() || z.id
+      } else if (z.id === 'central_hi') {
+        labelText = 'ARK'
+      }
+      if (labelText) {
+        const label = labelSprite(labelText, '#' + new THREE.Color(color).getHexString())
+        label.position.y = z.kind === 'base' ? 2.7 : 2.4
+        group.add(label)
+      }
 
       // 假投影：平贴地面的暗斑（不能用 Sprite——会竖着面向相机）
       const blob = new THREE.Mesh(
@@ -461,8 +543,8 @@ export default class MoonScene {
       blob.position.y = 0.045
       group.add(blob)
 
-      this.scene.add(group) // trap 的模型是独立的 jammer，但光环/名牌仍挂在 group 上
-      this.zoneNodes[z.id] = z.kind === 'trap' ? this.jammer : group
+      this.scene.add(group)
+      this.zoneNodes[z.id] = group
     })
   }
 
@@ -552,24 +634,42 @@ export default class MoonScene {
     this.rage = state.global?.moon_rage ?? 0
     this.rageTier = state.global?.moon_tier || 'sleep'
 
-    // 阵营状态 diff：宣布点火 / 发射 / 坠毁
+    // 阵营状态 diff：起飞改为前端手动触发，避免 Runtime/mock 自动发射干扰调试。
     ;(state.factions || []).forEach((f) => {
       const prev = this.prevVars[f.id] || {}
       const v = f.vars || {}
       const ship = this.ships[f.id]
       if (ship) {
-        if (v.launched && !prev.launched && ship.state !== 'launched') {
-          ship.state = 'launching'
-          ship.t = 0
-          this._spawnPulse(ship.group.position, FACTION_COLORS[f.id], 2.2)
-        } else if (v.crashed && !prev.crashed) {
+        if (v.crashed && !prev.crashed) {
           ship.state = 'crashed'
           ship.t = 0
           this._spawnPulse(ship.group.position, '#ff4d4d', 1.6)
         }
-        ship.declaring = !!v.declaring_launch
+        ship.declaring = false
       }
       this.prevVars[f.id] = { ...v }
+    })
+  }
+
+  launchShip(fid) {
+    const ship = this.ships[fid]
+    if (!ship || ship.state === 'launching') return
+    ship.node.visible = true
+    ship.node.position.y = 0
+    ship.node.rotation.z = 0
+    ship.state = 'launching'
+    ship.t = 0
+    this._spawnPulse(ship.group.position, FACTION_COLORS[fid], 2.2)
+  }
+
+  resetShips() {
+    Object.values(this.ships).forEach((ship) => {
+      ship.state = 'idle'
+      ship.t = 0
+      ship.declaring = false
+      ship.node.visible = true
+      ship.node.position.y = 0
+      ship.node.rotation.z = 0
     })
   }
 
@@ -585,6 +685,11 @@ export default class MoonScene {
       pos = unit ? unit.position.clone() : ship ? ship.group.position.clone() : null
     }
     if (ev.zone && this.zoneNodes[ev.zone]) pos = this.zoneNodes[ev.zone].position.clone()
+    const isArmThreat = /arm|meteor|jam|boss|attack|strike/i.test(ev.event_type || '')
+    if (isArmThreat) {
+      pos ||= new THREE.Vector3(0, 0, 0)
+      this._spawnArmLock(pos)
+    }
     if (!pos) return
     if (/jam|干扰/.test(ev.event_type || '')) color = '#f39c12'
     if (/crash|坠/.test(ev.event_type || '')) color = '#ff4d4d'
@@ -608,6 +713,26 @@ export default class MoonScene {
     beam.position.set(pos.x, 3.5, pos.z)
     this.scene.add(beam)
     this.fx.push({ ring, beam, t: 0, power })
+  }
+
+  _spawnArmLock(pos) {
+    const color = new THREE.Color(0xff3b30)
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.7, 0.86, 64),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false })
+    )
+    ring.rotation.x = -Math.PI / 2
+    ring.position.set(pos.x, 0.09, pos.z)
+
+    const origin = new THREE.Vector3(GRID / 2 + 3, 4.5, -GRID / 2 - 3)
+    const points = [origin, new THREE.Vector3(pos.x, 0.16, pos.z)]
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(points),
+      new THREE.LineDashedMaterial({ color, dashSize: 0.35, gapSize: 0.2, transparent: true, opacity: 0.85, depthWrite: false })
+    )
+    line.computeLineDistances()
+    this.scene.add(ring, line)
+    this.armFx.push({ ring, line, t: 0, life: 3.2 })
   }
 
   // ---------- 帧循环 ----------
@@ -663,7 +788,7 @@ export default class MoonScene {
         s.t += dt
         const k = s.t / 5
         node.position.y = Math.pow(k, 2.2) * 42
-        node.rotation.y += dt * 0.4
+        // 保持起飞姿态稳定，避免导出法线/材质在旋转时闪黑。
         if (Math.random() < 0.8) this._engineDust(s.group.position, node.position.y)
         if (k >= 1) {
           s.state = 'launched'
@@ -725,6 +850,22 @@ export default class MoonScene {
       return true
     })
 
+    this.armFx = this.armFx.filter((f) => {
+      f.t += dt
+      const remaining = Math.max(0, 1 - f.t / f.life)
+      const pulse = 1 + Math.sin(f.t * 12) * 0.12
+      f.ring.scale.setScalar(pulse)
+      f.ring.material.opacity = 0.35 + remaining * 0.55
+      f.line.material.opacity = 0.25 + remaining * 0.6
+      if (f.t < f.life) return true
+      this.scene.remove(f.ring, f.line)
+      f.ring.geometry.dispose()
+      f.ring.material.dispose()
+      f.line.geometry.dispose()
+      f.line.material.dispose()
+      return false
+    })
+
     // 引擎月尘粒子（发射时）
     this.dusts = (this.dusts || []).filter((d) => {
       d.t += dt
@@ -732,6 +873,7 @@ export default class MoonScene {
       d.mesh.material.opacity = 0.7 * (1 - d.t / d.life)
       if (d.t >= d.life) {
         this.scene.remove(d.mesh)
+        d.mesh.material.dispose()
         return false
       }
       return true
@@ -752,8 +894,6 @@ export default class MoonScene {
         }
       })
     }
-    this.bloom.strength = 0.7 + env.red * 0.35 + Math.sin(t * 3) * env.red * 0.1
-
     // 终局震屏
     const shakeAmp = this.rageTier === 'endgame' ? 0.05 : 0
     this.shake += (shakeAmp - this.shake) * dt * 3
@@ -770,14 +910,15 @@ export default class MoonScene {
 
     this.stars.rotation.y += dt * 0.004
     this.controls.update()
-    this.composer.render()
+    // 稳定模式：直接渲染，绕过 Bloom/EffectComposer 的额外帧缓冲。
+    this.renderer.render(this.scene, this.camera)
   }
 
   _engineDust(basePos, height) {
     this.dusts = this.dusts || []
     if (this.dusts.length > 120) return
     const m = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: glowSpriteTexture('rgba(255,190,120,1)'), transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending })
+      new THREE.SpriteMaterial({ map: this.engineDustTexture, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending })
     )
     const a = Math.random() * Math.PI * 2
     m.position.set(basePos.x + Math.cos(a) * 0.3, Math.max(0.2, height - 0.4 + basePos.y), basePos.z + Math.sin(a) * 0.3)
@@ -803,7 +944,7 @@ export default class MoonScene {
         })
       }
     })
-    this.composer.dispose()
+    this.engineDustTexture.dispose()
     this.renderer.dispose()
     if (this.renderer.domElement.parentNode) this.renderer.domElement.parentNode.removeChild(this.renderer.domElement)
   }

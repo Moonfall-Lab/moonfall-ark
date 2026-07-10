@@ -8,115 +8,126 @@ body,
   height: 100%;
   margin: 0;
 }
+
 body {
   overflow: hidden;
   color-scheme: dark;
-  color: var(--text);
-  background: var(--bg);
+  background: #090B0C;
+  color: var(--lunar-white);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============ 月尘工业色令牌 ============ */
+:root {
+  --bg: #090B0C;
+  --panel: #121619;
+  --panel-strong: #1A1F22;
+  --lunar-white: #E7E1D6;
+  --muted-text: #8E9497;
+  --grid-line: rgba(190, 204, 210, 0.14);
+
+  --system-cyan: #63C7C4;
+  --warning-amber: #E9B44C;
+  --danger-red: #F0523D;
+  --critical-red: #FF2F2F;
+
+  --font-body: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-sc: 'Noto Sans SC', sans-serif;
+  --font-condensed: 'Oswald', sans-serif;
+}
+
+/* ============ 通用面板 ============ */
+.panel {
+  background: var(--panel);
+  border: 1px solid rgba(190, 204, 210, 0.06);
+  color: var(--lunar-white);
+}
+
+.panel-strong {
+  background: var(--panel-strong);
+  border: 1px solid rgba(190, 204, 210, 0.08);
+}
+
+/* ============ 文字层级 ============ */
+.font-sc { font-family: var(--font-sc); }
+.font-mono { font-family: var(--font-body); }
+.font-condensed { font-family: var(--font-condensed); }
+
+/* 中文正文：加大字重，方便远距离阅读 */
+.font-sc {
+  font-weight: 500;
+}
+
+/* 灰色文字稍微亮一点 */
+.text-muted {
+  color: #9CA2A6;
+}
+
+/* 英文系统编码：保持宽字距 */
+.text-label {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted-text);
   font-family: var(--font-body);
 }
 
-/* ============ 主题令牌 ============ */
-/* 默认 = 写实月面 lunar */
-:root,
-[data-theme='lunar'] {
-  --bg: radial-gradient(1300px 900px at 50% 38%, #1b2230 0%, #0a0e16 58%, #05070a 100%);
-  --map-bg: radial-gradient(circle at 50% 42%, #333a47 0%, #1a1f2a 55%, #0c0f16 100%);
-  --panel-bg: rgba(8, 12, 20, 0.5);
-  --panel-blur: 10px;
-  --panel-radius: 8px;
-  --text: #e8f0ff;
-  --muted: rgba(232, 240, 255, 0.45);
-  --accent: #00f2ff;
-  --grid: rgba(0, 242, 255, 0.06);
-  --font-body: 'JetBrains Mono', ui-monospace, monospace;
-  --font-title: 'Orbitron', 'JetBrains Mono', sans-serif;
-  --panel-shadow: 0 0 26px;
+/* 中文：不使用宽字距（中文不适合大幅拉开） */
+.font-sc.tracking-wide,
+.font-sc.tracking-widest {
+  letter-spacing: 0.05em;
 }
 
-/* 复古像素 pixel：硬边、厚描边、像素字 */
-[data-theme='pixel'] {
-  --bg: #0b0b1a;
-  --map-bg: #14142c;
-  --panel-bg: #1b1b33;
-  --panel-blur: 0px;
-  --panel-radius: 0px;
-  --text: #ececff;
-  --muted: rgba(236, 236, 255, 0.55);
-  --accent: #ffd34d;
-  --grid: rgba(255, 255, 255, 0.08);
-  --font-body: 'VT323', 'JetBrains Mono', monospace;
-  --font-title: 'Press Start 2P', monospace;
-  --panel-shadow: 5px 5px 0 rgba(0, 0, 0, 0.6);
-}
-[data-theme='pixel'] {
-  font-size: 18px; /* VT323 偏小，放大 */
-  letter-spacing: 0.5px;
-}
-[data-theme='pixel'] img,
-[data-theme='pixel'] svg {
-  image-rendering: pixelated;
+/* ============ 心率颜色分级 ============ */
+.hr-normal { color: var(--lunar-white); }
+.hr-elevated { color: var(--warning-amber); }
+.hr-high { color: var(--danger-red); }
+.hr-critical { color: var(--critical-red); }
+
+/* ============ 事件类型图标 ============ */
+.ev-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  flex-shrink: 0;
 }
 
-/* ============ 通用组件皮肤 ============ */
-.panel {
-  background: var(--panel-bg);
-  backdrop-filter: blur(var(--panel-blur));
-  -webkit-backdrop-filter: blur(var(--panel-blur));
-  border-radius: var(--panel-radius);
-  color: var(--text);
-}
-.map-stage {
-  background: var(--map-bg);
-  border-radius: var(--panel-radius);
-}
-.title-font {
-  font-family: var(--font-title);
-}
-.muted {
-  color: var(--muted);
-}
-
-/* 扫描线只在 lunar 用 */
-.scanlines::after {
+/* ============ 扫描线（仅终局使用） ============ */
+.scanlines-endgame::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 30;
+  z-index: 50;
   background: repeating-linear-gradient(
     0deg,
-    rgba(0, 0, 0, 0) 0,
-    rgba(0, 0, 0, 0) 2px,
-    rgba(0, 0, 0, 0.16) 3px
+    transparent 0,
+    transparent 3px,
+    rgba(255, 47, 47, 0.03) 4px
   );
-  mix-blend-mode: multiply;
 }
 
-.glow-cyan {
-  text-shadow: 0 0 8px rgba(0, 242, 255, 0.7);
+/* ============ 终局危险条 ============ */
+.danger-bar {
+  background: linear-gradient(90deg, transparent, rgba(240, 82, 61, 0.15), transparent);
 }
 
-.animate-pulse-red {
-  animation: pulseRed 2s ease-in-out infinite;
-}
-@keyframes pulseRed {
-  0%,
-  100% {
-    box-shadow: inset 0 0 120px rgba(255, 77, 77, 0);
-  }
-  50% {
-    box-shadow: inset 0 0 220px rgba(255, 77, 77, 0.35);
-  }
-}
-
+/* ============ 调试按钮 ============ */
 .debug-btn {
   padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(0, 242, 255, 0.4);
-  color: #00f2ff;
+  border: 1px solid rgba(99, 199, 196, 0.3);
+  color: var(--system-cyan);
   transition: background 0.15s ease;
 }
 .debug-btn:hover {
-  background: rgba(0, 242, 255, 0.1);
+  background: rgba(99, 199, 196, 0.08);
 }
+
+/* ============ 滚动条 ============ */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(190, 204, 210, 0.12); }
