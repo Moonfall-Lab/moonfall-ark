@@ -1,4 +1,12 @@
 import { motion, AnimatePresence } from 'framer-motion'
+import { factionColor } from '../lib/factions'
+
+const PLAYER_ART = {
+  pa: '/assets/ui/players/pa.png',
+  pb: '/assets/ui/players/pb.png',
+  pc: '/assets/ui/players/pc.png?v=2',
+  pd: '/assets/ui/players/pd.png',
+}
 
 // 心率分级颜色
 function hrColor(hr) {
@@ -54,6 +62,27 @@ export default function PlayerBar({ faction, config, unit, stressPct = 0 }) {
     >
       {/* 左侧色条 */}
       <div className="w-[3px] flex-shrink-0" style={{ background: color }} />
+
+      <div
+        className="telemetry-portrait relative my-1.5 ml-1.5 w-9 flex-shrink-0 overflow-hidden border border-white/[0.07] bg-black/20"
+        style={{ borderRightColor: color }}
+      >
+        {PLAYER_ART[faction.id] ? (
+          <img
+            src={PLAYER_ART[faction.id]}
+            alt=""
+            className="absolute inset-0 h-full w-full scale-[1.4] object-cover object-top opacity-85 brightness-110 contrast-115"
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center opacity-45" style={{ color }}>
+            <div className="h-5 w-5 rounded-full border border-current" />
+            <div className="-mt-px h-3 w-7 rounded-t-lg border-x border-t border-current" />
+            <span className="mt-1 font-mono text-[7px]">{faction.id.toUpperCase()}</span>
+          </div>
+        )}
+        {/* 右侧玩家色竖线 */}
+        <div className="absolute right-0 top-0 bottom-0 w-[2px]" style={{ background: color, opacity: 0.7 }} />
+      </div>
 
       <div className="flex-1 px-2.5 py-1.5">
         {/* 第一行：代号 + 名称 + 心率 */}
@@ -135,5 +164,3 @@ export default function PlayerBar({ faction, config, unit, stressPct = 0 }) {
     </motion.div>
   )
 }
-
-import { factionColor } from '../lib/factions'

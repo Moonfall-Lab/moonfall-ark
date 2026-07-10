@@ -127,6 +127,32 @@ body {
   background: rgba(99, 199, 196, 0.08);
 }
 
+/* 低权重遥测识别图：扫描线与细微暗角让素材属于仪器而非角色卡。 */
+.telemetry-portrait::after,
+.telemetry-moon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(0, 0, 0, 0.2) 3px),
+    radial-gradient(circle at center, transparent 42%, rgba(0, 0, 0, 0.38) 100%);
+}
+
+.telemetry-moon {
+  box-shadow: 0 0 0 2px rgba(142, 148, 151, 0.08), inset 0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+.telemetry-moon::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  z-index: 2;
+  border: 1px dashed rgba(174, 181, 181, 0.18);
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
 /* ============ 滚动条 ============ */
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }

@@ -29,9 +29,12 @@ export default function MissionPanel({ state, config }) {
   // 关键贡献者：燃料最多
   const topContributor = [...factions].sort((a, b) => (b.vars?.fuel || 0) - (a.vars?.fuel || 0))[0]
 
-  // 阶段判断
+  // 阶段判断：所有阵营升空或坠毁后才算结算
+  // 同时要求至少有 1 人升空（避免开局全部未动就算结算）
   const isEndgame = tier === 'endgame'
-  const isResolved = launchedCount + crashedCount >= factions.length && factions.length > 0
+  const allDone = factions.length > 0 && factions.every((f) => f.vars?.launched || f.vars?.crashed)
+  const hasLaunched = launchedCount > 0
+  const isResolved = allDone && hasLaunched
 
   // ========== 正常阶段 ==========
   function renderNormal() {
@@ -41,6 +44,14 @@ export default function MissionPanel({ state, config }) {
       { label: '幸存机器人', code: 'ROVERS', value: `${aliveUnits} / ${totalUnits}`, pct: (aliveUnits / totalUnits) * 100, color: '#E7E1D6' },
       { label: '已升空', code: 'LAUNCH', value: `${launchedCount} / ${factions.length}`, pct: (launchedCount / factions.length) * 100, color: '#E9B44C' },
     ]
+
+    // 因果总结
+    const stressValues = factions.map((f) => Math.max(0, (f.vars?.heart_rate || 0) - 60))
+    const totalStress = stressValues.reduce((s, v) => s + v, 0) || 1
+    const topStressIdx = stressValues.indexOf(Math.max(...stressValues))
+    const topStressFaction = factions[topStressIdx]
+    const topStressPct = Math.round((stressValues[topStressIdx] / totalStress) * 100)
+
     return (
       <>
         <div className="flex-1 px-3 py-2 space-y-3">
@@ -61,6 +72,8 @@ export default function MissionPanel({ state, config }) {
             </div>
           ))}
         </div>
+
+        {/* 关键贡献 */}
         <div className="px-3 py-2 border-t border-white/5">
           <div className="text-[8px] font-mono text-muted tracking-[0.15em] mb-1">关键贡献 / TOP</div>
           {topContributor && topContributor.vars?.fuel > 0 ? (
@@ -76,6 +89,27 @@ export default function MissionPanel({ state, config }) {
             <span className="text-[9px] text-muted font-sc">尚无数据</span>
           )}
         </div>
+
+        {/* 因果总结 */}
+        {topStressFaction && topStressPct > 0 && (
+          <div className="px-3 py-2 border-t border-white/5">
+            <div className="text-[8px] font-mono text-muted tracking-[0.15em] mb-1.5">因果总结 / CAUSAL</div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-sc text-[9px] text-muted-text">最高压力玩家</span>
+                <span className="font-condensed text-xs font-bold" style={{ color: '#F0523D' }}>
+                  {topStressFaction.id.toUpperCase()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-sc text-[9px] text-muted-text">狂暴贡献</span>
+                <span className="font-condensed text-xs font-bold tabular-nums" style={{ color: '#F0523D' }}>
+                  {topStressPct}%
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     )
   }

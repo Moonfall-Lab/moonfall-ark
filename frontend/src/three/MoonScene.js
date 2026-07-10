@@ -56,25 +56,25 @@ function glowSpriteTexture(inner = 'rgba(255,255,255,1)', outer = 'rgba(255,255,
 function labelSprite(text, color = '#e8f0ff') {
   const c = document.createElement('canvas')
   const g = c.getContext('2d')
-  const font = '600 42px "JetBrains Mono", monospace'
+  const font = '600 32px "IBM Plex Mono", monospace'
   g.font = font
-  const w = Math.ceil(g.measureText(text).width) + 36
+  const w = Math.ceil(g.measureText(text).width) + 24
   c.width = w
-  c.height = 72
+  c.height = 48
   const g2 = c.getContext('2d')
   g2.font = font
-  g2.fillStyle = 'rgba(5,8,14,0.35)'
+  g2.fillStyle = 'rgba(5,8,12,0.6)'
   g2.beginPath()
-  g2.roundRect(0, 6, w, 60, 10)
+  g2.roundRect(0, 4, w, 40, 6)
   g2.fill()
   g2.fillStyle = color
   g2.textBaseline = 'middle'
-  g2.fillText(text, 18, 38)
+  g2.fillText(text, 12, 26)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
-  const m = new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false })
+  const m = new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, opacity: 0.8 })
   const s = new THREE.Sprite(m)
-  s.scale.set(w / 90, 0.8, 1)
+  s.scale.set(w / 130, 0.48, 1)
   return s
 }
 
@@ -261,7 +261,7 @@ export default class MoonScene {
     minorGeo.setAttribute('position', new THREE.Float32BufferAttribute(minorPts, 3))
     this.gridLines = new THREE.LineSegments(
       minorGeo,
-      new THREE.LineBasicMaterial({ color: 0x8a9293, transparent: true, opacity: 0.11, depthWrite: false })
+      new THREE.LineBasicMaterial({ color: 0x8a9293, transparent: true, opacity: 0.04, depthWrite: false })
     )
     this.gridLines.position.y = 0.035
     this.scene.add(this.gridLines)
@@ -270,26 +270,76 @@ export default class MoonScene {
     majorGeo.setAttribute('position', new THREE.Float32BufferAttribute(majorPts, 3))
     const majorLines = new THREE.LineSegments(
       majorGeo,
-      new THREE.LineBasicMaterial({ color: 0x9aa2a3, transparent: true, opacity: 0.25, depthWrite: false })
+      new THREE.LineBasicMaterial({ color: 0x9aa2a3, transparent: true, opacity: 0.1, depthWrite: false })
     )
     majorLines.position.y = 0.038
     this.scene.add(majorLines)
 
     // 边缘只保留短段状态灯，不再使用完整青色 AR 外框。
+    // 不对称：部分灯段损坏或被尘土遮住，营造真实工程感。
     const edgeLights = new THREE.Group()
-    const lightMat = new THREE.MeshBasicMaterial({ color: 0x69c9c7, transparent: true, opacity: 0.55 })
+    const makeLightMat = (opacity) => new THREE.MeshBasicMaterial({ color: 0x69c9c7, transparent: true, opacity })
+    const dimMat = new THREE.MeshBasicMaterial({ color: 0x4a5253, transparent: true, opacity: 0.18 })
+    const lightConfigs = [
+      { opacity: 0.55 }, { opacity: 0.4 }, { opacity: 0.15, dim: true },
+      { opacity: 0.5 }, { opacity: 0.3 }, { opacity: 0.55 },
+    ]
+    let lcIdx = 0
     ;[-3.8, 0, 3.8].forEach((v) => {
       ;[-1, 1].forEach((side) => {
-        const horizontal = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.035, 0.07), lightMat)
+        const cfg = lightConfigs[lcIdx % lightConfigs.length]
+        lcIdx++
+        const mat = cfg.dim ? dimMat : makeLightMat(cfg.opacity)
+        const horizontal = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.035, 0.07), mat)
         horizontal.position.set(v, 0.055, side * (half - 0.08))
         edgeLights.add(horizontal)
-        const vertical = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.035, 1.25), lightMat)
+        const vertical = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.035, 1.25), mat.clone())
         vertical.position.set(side * (half - 0.08), 0.055, v)
         edgeLights.add(vertical)
       })
     })
     this.edgeLights = edgeLights
     this.scene.add(edgeLights)
+
+    // 静态积尘贴花：底盘与月面交界处的不规则尘土覆盖
+    // 不是粒子，只是平贴地面的半透明面片
+    const dustCanvas = document.createElement('canvas')
+    dustCanvas.width = dustCanvas.height = 128
+    const dg = dustCanvas.getContext('2d')
+    const dgrad = dg.createRadialGradient(64, 64, 10, 64, 64, 60)
+    dgrad.addColorStop(0, 'rgba(150,142,130,0.5)')
+    dgrad.addColorStop(0.5, 'rgba(120,112,102,0.25)')
+    dgrad.addColorStop(1, 'rgba(100,94,88,0)')
+    dg.fillStyle = dgrad
+    dg.fillRect(0, 0, 128, 128)
+    const dustTex = new THREE.CanvasTexture(dustCanvas)
+    dustTex.colorSpace = THREE.SRGBColorSpace
+    const dustMat = new THREE.MeshBasicMaterial({
+      map: dustTex,
+      transparent: true,
+      opacity: 0.15,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+    // 底盘四边各放 2 片不规则尘土
+    const dustPositions = []
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2
+      const cx = Math.cos(angle) * (half + 0.8)
+      const cz = Math.sin(angle) * (half + 0.8)
+      dustPositions.push({ x: cx, z: cz, rot: Math.random() * Math.PI, scale: 2.5 + Math.random() * 1.5 })
+      dustPositions.push({ x: cx * 0.6, z: cz * 0.6, rot: Math.random() * Math.PI, scale: 1.8 + Math.random() * 1.2 })
+    }
+    dustPositions.forEach((dp) => {
+      const dustMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(dp.scale, dp.scale),
+        dustMat.clone()
+      )
+      dustMesh.rotation.x = -Math.PI / 2
+      dustMesh.rotation.z = dp.rot
+      dustMesh.position.set(dp.x, 0.04, dp.z)
+      this.scene.add(dustMesh)
+    })
   }
 
   _buildSky() {
@@ -530,7 +580,7 @@ export default class MoonScene {
       }
       if (labelText) {
         const label = labelSprite(labelText, '#' + new THREE.Color(color).getHexString())
-        label.position.y = z.kind === 'base' ? 2.7 : 2.4
+        label.position.y = z.kind === 'base' ? 2.2 : 1.9
         group.add(label)
       }
 
@@ -696,43 +746,158 @@ export default class MoonScene {
     this._spawnPulse(pos, color, 1.4)
   }
 
-  // 冲击波环 + 光柱
+  // 冲击波环 + 细光柱（弱化版：透明度更低，光柱更细）
   _spawnPulse(pos, colorHex, power = 1) {
     const color = new THREE.Color(colorHex)
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.1, 0.22, 48),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })
     )
     ring.rotation.x = -Math.PI / 2
     ring.position.set(pos.x, 0.06, pos.z)
     this.scene.add(ring)
+    // 光柱改为细圆柱（更克制）
     const beam = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.2, 7, 12, 1, true),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })
+      new THREE.CylinderGeometry(0.05, 0.08, 5, 8, 1, true),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })
     )
-    beam.position.set(pos.x, 3.5, pos.z)
+    beam.position.set(pos.x, 2.5, pos.z)
     this.scene.add(beam)
     this.fx.push({ ring, beam, t: 0, power })
   }
 
+  // 机械臂锁定版：地面锁定圈 + 扫描带 + 细光柱 + 目标高亮
+  // 替代旧版"完整大圆环"，更精准、危险、有"来源"
   _spawnArmLock(pos) {
-    const color = new THREE.Color(0xff3b30)
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.7, 0.86, 64),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false })
-    )
-    ring.rotation.x = -Math.PI / 2
-    ring.position.set(pos.x, 0.09, pos.z)
+    const group = new THREE.Group()
+    group.position.set(pos.x, 0, pos.z)
 
+    // 1. 地面锁定圈（外圈）：断续扫描环（不完整闭合，更像"正在工作"）
+    const outerRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.78, 0.86, 48, 1, 0, Math.PI * 1.7),
+      new THREE.MeshBasicMaterial({
+        color: 0xa6e2e0,
+        transparent: true,
+        opacity: 0.55,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    )
+    outerRing.rotation.x = -Math.PI / 2
+    outerRing.rotation.z = -Math.PI * 0.35 // 缺口朝向扫描源
+    outerRing.position.y = 0.085
+    group.add(outerRing)
+
+    // 2. 内圈实心锁定环（细，更冷）
+    const innerRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.6, 0.66, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0xc9f0ee,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    )
+    innerRing.rotation.x = -Math.PI / 2
+    innerRing.position.y = 0.08
+    group.add(innerRing)
+
+    // 3. 目标脚下小锁定圈（最贴近模型）
+    const targetRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.35, 0.4, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0xff3b30,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    )
+    targetRing.rotation.x = -Math.PI / 2
+    targetRing.position.y = 0.075
+    group.add(targetRing)
+
+    // 4. 细光柱（从天空投下）：上宽下窄锥体
+    const beamGeo = new THREE.ConeGeometry(0.4, 8, 16, 1, true)
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: 0xa6e2e0,
+      transparent: true,
+      opacity: 0.15,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+    const beam = new THREE.Mesh(beamGeo, beamMat)
+    beam.position.y = 4
+    beam.rotation.x = Math.PI // 尖端朝下
+    group.add(beam)
+
+    // 5. 内核细亮柱（更明亮、集中在中央）
+    const innerBeam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.06, 7, 8, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0xeafbff,
+        transparent: true,
+        opacity: 0.55,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    )
+    innerBeam.position.y = 3.5
+    group.add(innerBeam)
+
+    // 6. 扫描带（关键动效）：从原点方向扫入、缓慢推进
+    const scanLine = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.05, 1.4),
+      new THREE.MeshBasicMaterial({
+        color: 0xd7ffff,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    )
+    scanLine.rotation.x = -Math.PI / 2
+    scanLine.position.y = 0.09
+    group.add(scanLine)
+
+    // 7. 来源虚线（从画外天空指向目标）：提示"谁在打"
     const origin = new THREE.Vector3(GRID / 2 + 3, 4.5, -GRID / 2 - 3)
-    const points = [origin, new THREE.Vector3(pos.x, 0.16, pos.z)]
+    const points = [origin, new THREE.Vector3(0, 0.16, 0)]
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(points)
     const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineDashedMaterial({ color, dashSize: 0.35, gapSize: 0.2, transparent: true, opacity: 0.85, depthWrite: false })
+      lineGeo,
+      new THREE.LineDashedMaterial({
+        color: 0xff3b30,
+        dashSize: 0.32,
+        gapSize: 0.22,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+      })
     )
     line.computeLineDistances()
-    this.scene.add(ring, line)
-    this.armFx.push({ ring, line, t: 0, life: 3.2 })
+
+    this.scene.add(group)
+    this.scene.add(line)
+    this.armFx.push({
+      group,
+      outerRing,
+      innerRing,
+      targetRing,
+      beam,
+      innerBeam,
+      scanLine,
+      line,
+      t: 0,
+      life: 3.2,
+    })
   }
 
   // ---------- 帧循环 ----------
@@ -844,8 +1009,8 @@ export default class MoonScene {
       }
       const r = 0.2 + k * 3.2 * f.power
       f.ring.scale.set(r / 0.16, r / 0.16, 1)
-      f.ring.material.opacity = 0.95 * (1 - k)
-      f.beam.material.opacity = 0.5 * (1 - k)
+      f.ring.material.opacity = 0.55 * (1 - k)
+      f.beam.material.opacity = 0.25 * (1 - k)
       f.beam.scale.set(1 - k * 0.5, 1, 1 - k * 0.5)
       return true
     })
@@ -853,14 +1018,55 @@ export default class MoonScene {
     this.armFx = this.armFx.filter((f) => {
       f.t += dt
       const remaining = Math.max(0, 1 - f.t / f.life)
-      const pulse = 1 + Math.sin(f.t * 12) * 0.12
-      f.ring.scale.setScalar(pulse)
-      f.ring.material.opacity = 0.35 + remaining * 0.55
-      f.line.material.opacity = 0.25 + remaining * 0.6
+      const k = f.t / f.life // 0 → 1 进度
+
+      // 危险升级：最后 30% 由冷青转为红色
+      const danger = Math.max(0, (k - 0.7) / 0.3)
+      const r = 0xa6e2e0
+      const g = 0x64 + (0x3b - 0x64) * danger // 0x64 → 0x3b
+      const b = 0xe0 + (0x30 - 0xe0) * danger
+      const tintColor = (Math.floor(r) << 16) | (Math.floor(g) << 8) | Math.floor(b)
+
+      // 主锁定环：轻微脉冲
+      const pulse = 1 + Math.sin(f.t * 8) * 0.06
+      f.innerRing.scale.setScalar(pulse)
+      f.innerRing.material.opacity = 0.35 * remaining + 0.15
+      f.innerRing.material.color.setHex(tintColor)
+
+      // 外圈扫描环：缓慢自转
+      f.outerRing.rotation.z += dt * 0.6
+      f.outerRing.material.opacity = 0.4 * remaining + 0.1
+      f.outerRing.material.color.setHex(tintColor)
+
+      // 目标脚下小圈：高频脉动（最显眼）
+      const targetPulse = 1 + Math.sin(f.t * 14) * 0.18
+      f.targetRing.scale.setScalar(targetPulse)
+      f.targetRing.material.opacity = (0.55 + danger * 0.4) * remaining
+
+      // 扫描带：按角度自转（最关键的动效）
+      const scanRadius = 0.74
+      f.scanLine.position.x = Math.cos(f.t * 1.4) * scanRadius
+      f.scanLine.position.z = Math.sin(f.t * 1.4) * scanRadius
+      f.scanLine.rotation.z = -f.t * 1.4 + Math.PI / 2
+      f.scanLine.material.opacity = 0.7 * remaining
+
+      // 细光柱：呼吸式衰减
+      f.beam.material.opacity = 0.13 * remaining
+      f.beam.scale.set(1, 0.8 + Math.sin(f.t * 6) * 0.05, 1)
+      f.beam.material.color.setHex(tintColor)
+      f.innerBeam.material.opacity = 0.5 * remaining
+      f.innerBeam.material.color.setHex(tintColor)
+
+      // 来源虚线
+      f.line.material.opacity = 0.5 * remaining
+      f.line.material.color.setHex(danger > 0.5 ? 0xff3b30 : tintColor)
+
       if (f.t < f.life) return true
-      this.scene.remove(f.ring, f.line)
-      f.ring.geometry.dispose()
-      f.ring.material.dispose()
+      this.scene.remove(f.group, f.line)
+      f.group.traverse((o) => {
+        if (o.geometry) o.geometry.dispose()
+        if (o.material) o.material.dispose()
+      })
       f.line.geometry.dispose()
       f.line.material.dispose()
       return false

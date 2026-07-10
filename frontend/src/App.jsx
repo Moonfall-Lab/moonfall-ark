@@ -73,7 +73,7 @@ export default function App() {
         </div>
 
         <div className="w-[260px] flex-shrink-0 p-2">
-          <EventTimeline events={events} />
+          <EventTimeline events={events} status={status} rage={state.global?.moon_rage ?? 0} />
         </div>
       </div>
 

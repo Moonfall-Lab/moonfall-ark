@@ -23,12 +23,9 @@ export default function DangerOverlay() {
         exit={{ y: -30, opacity: 0 }}
         className="absolute top-[60px] left-1/2 -translate-x-1/2 z-40 pointer-events-none"
       >
-        <div className="flex items-center gap-2 px-4 py-1 danger-bar">
+        <div className="flex items-center px-4 py-1 danger-bar">
           <span className="text-[10px] font-mono font-semibold tracking-wider" style={{ color: '#FF2F2F' }}>
             ⚠ ENDGAME
-          </span>
-          <span className="text-[10px] font-sc" style={{ color: 'rgba(255, 47, 47, 0.7)' }}>
-            机械臂已解除攻击限制
           </span>
         </div>
       </motion.div>
