@@ -1,0 +1,74 @@
+game: moonfall
+mode: coop
+
+map:
+  grid: [12, 12]
+  zones:
+    base:
+      name: 方舟基地
+      center: [6, 6]
+    resource_ne:
+      name: 东北资源区
+      center: [9, 2]
+    resource_sw:
+      name: 西南资源区
+      center: [2, 9]
+    relic_nw:
+      name: 西北遗迹区
+      center: [2, 2]
+    relic_se:
+      name: 东南遗迹区
+      center: [9, 9]
+    dust_center:
+      name: 中央月尘区
+      center: [6, 3]
+
+players:
+  - id: p1
+    name: 玩家1
+    robot_id: r1
+  - id: p2
+    name: 玩家2
+    robot_id: r2
+  - id: p3
+    name: 玩家3
+    robot_id: r3
+  - id: p4
+    name: 玩家4
+    robot_id: r4
+
+rules:
+  fuel_win: 100
+  boss_at: 70
+  core_hp: 100
+  moon_rage_threshold: 0.7
+  baseline_hr: 80
+  rage_scale: 40
+
+robots:
+  default_hp: 50
+  behavior_tick_sec: 2
+
+arm:
+  safe_mode: true
+  actions:
+    - drop_dust
+    - move_obstacle
+    - strike
+    - hover_warning
+    - home
+    - emergency_stop
+
+voice:
+  enabled: true
+  action_space:
+    - move_to
+    - collect
+    - escort
+    - avoid_and_move
+    - return_base
+    - stop
+
+heartbeat:
+  baseline_seconds: 30
+  rage_scale: 40

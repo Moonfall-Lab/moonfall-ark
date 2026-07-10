@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Moonfall Runtime Frontend WS Example</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #111827;
+      color: #e5e7eb;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #111827;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    header, section {
+      margin-bottom: 18px;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 12px;
+      letter-spacing: 0;
+    }
+    h2 {
+      font-size: 18px;
+      margin: 0 0 10px;
+      letter-spacing: 0;
+    }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    input, button {
+      border: 1px solid #374151;
+      background: #1f2937;
+      color: #f9fafb;
+      border-radius: 6px;
+      padding: 9px 11px;
+      font-size: 14px;
+    }
+    input {
+      min-width: 280px;
+      flex: 1;
+    }
+    button {
+      cursor: pointer;
+    }
+    button:hover {
+      background: #263244;
+    }
+    .status {
+      color: #93c5fd;
+      font-size: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    pre {
+      margin: 0;
+      min-height: 220px;
+      max-height: 420px;
+      overflow: auto;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      background: #0b1220;
+      color: #d1d5db;
+      padding: 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    @media (max-width: 780px) {
+      main {
+        padding: 16px;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      input {
+        min-width: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Moonfall Runtime WebSocket Example</h1>
+      <div class="toolbar">
+        <input id="wsUrl" value="ws://127.0.0.1:8000/ws" />
+        <button id="connectBtn">连接</button>
+        <button id="disconnectBtn">断开</button>
+        <span id="status" class="status">未连接</span>
+      </div>
+    </header>
+
+    <section class="toolbar">
+      <input id="voiceText" value="让一号车绕开月尘去东北资源区采集燃料" />
+      <button id="sendVoiceBtn">发送语音</button>
+      <button id="sendHrBtn">发送心率</button>
+    </section>
+
+    <section class="grid">
+      <div>
+        <h2>state.world</h2>
+        <pre id="worldBox">{}</pre>
+      </div>
+      <div>
+        <h2>state.event / cmd.robot / cmd.arm / error</h2>
+        <pre id="eventBox"></pre>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const wsUrl = document.querySelector("#wsUrl");
+    const statusEl = document.querySelector("#status");
+    const worldBox = document.querySelector("#worldBox");
+    const eventBox = document.querySelector("#eventBox");
+    const voiceText = document.querySelector("#voiceText");
+    let socket = null;
+
+    function runtimeMessage(topic, source, payload) {
+      return { topic, source, timestamp: Date.now() / 1000, payload };
+    }
+
+    function appendEvent(message) {
+      const line = JSON.stringify(message, null, 2);
+      eventBox.textContent = `${line}\n\n${eventBox.textContent}`.slice(0, 12000);
+    }
+
+    function connect() {
+      if (socket && socket.readyState === WebSocket.OPEN) return;
+      socket = new WebSocket(wsUrl.value.trim());
+      statusEl.textContent = "连接中";
+      socket.onopen = () => { statusEl.textContent = "已连接"; };
+      socket.onclose = () => { statusEl.textContent = "已断开"; };
+      socket.onerror = () => { statusEl.textContent = "连接错误"; };
+      socket.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        if (message.topic === "state.world") {
+          worldBox.textContent = JSON.stringify(message.payload, null, 2);
+        } else {
+          appendEvent(message);
+        }
+      };
+    }
+
+    function send(message) {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        appendEvent({ topic: "local.error", payload: { message: "WebSocket 未连接" } });
+        return;
+      }
+      socket.send(JSON.stringify(message));
+    }
+
+    document.querySelector("#connectBtn").addEventListener("click", connect);
+    document.querySelector("#disconnectBtn").addEventListener("click", () => {
+      if (socket) socket.close();
+    });
+    document.querySelector("#sendVoiceBtn").addEventListener("click", () => {
+      send(runtimeMessage("input.voice", "frontend", { player_id: "p1", text: voiceText.value }));
+    });
+    document.querySelector("#sendHrBtn").addEventListener("click", () => {
+      send(runtimeMessage("sensor.hr", "frontend", { player_id: "p1", heart_rate: 105 }));
+    });
+  </script>
+</body>
+</html>
