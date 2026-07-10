@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  overflow: hidden;
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--font-body);
+}
+
+/* ============ 主题令牌 ============ */
+/* 默认 = 写实月面 lunar */
+:root,
+[data-theme='lunar'] {
+  --bg: radial-gradient(1300px 900px at 50% 38%, #1b2230 0%, #0a0e16 58%, #05070a 100%);
+  --map-bg: radial-gradient(circle at 50% 42%, #333a47 0%, #1a1f2a 55%, #0c0f16 100%);
+  --panel-bg: rgba(8, 12, 20, 0.5);
+  --panel-blur: 10px;
+  --panel-radius: 8px;
+  --text: #e8f0ff;
+  --muted: rgba(232, 240, 255, 0.45);
+  --accent: #00f2ff;
+  --grid: rgba(0, 242, 255, 0.06);
+  --font-body: 'JetBrains Mono', ui-monospace, monospace;
+  --font-title: 'Orbitron', 'JetBrains Mono', sans-serif;
+  --panel-shadow: 0 0 26px;
+}
+
+/* 复古像素 pixel：硬边、厚描边、像素字 */
+[data-theme='pixel'] {
+  --bg: #0b0b1a;
+  --map-bg: #14142c;
+  --panel-bg: #1b1b33;
+  --panel-blur: 0px;
+  --panel-radius: 0px;
+  --text: #ececff;
+  --muted: rgba(236, 236, 255, 0.55);
+  --accent: #ffd34d;
+  --grid: rgba(255, 255, 255, 0.08);
+  --font-body: 'VT323', 'JetBrains Mono', monospace;
+  --font-title: 'Press Start 2P', monospace;
+  --panel-shadow: 5px 5px 0 rgba(0, 0, 0, 0.6);
+}
+[data-theme='pixel'] {
+  font-size: 18px; /* VT323 偏小，放大 */
+  letter-spacing: 0.5px;
+}
+[data-theme='pixel'] img,
+[data-theme='pixel'] svg {
+  image-rendering: pixelated;
+}
+
+/* ============ 通用组件皮肤 ============ */
+.panel {
+  background: var(--panel-bg);
+  backdrop-filter: blur(var(--panel-blur));
+  -webkit-backdrop-filter: blur(var(--panel-blur));
+  border-radius: var(--panel-radius);
+  color: var(--text);
+}
+.map-stage {
+  background: var(--map-bg);
+  border-radius: var(--panel-radius);
+}
+.title-font {
+  font-family: var(--font-title);
+}
+.muted {
+  color: var(--muted);
+}
+
+/* 扫描线只在 lunar 用 */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.16) 3px
+  );
+  mix-blend-mode: multiply;
+}
+
+.glow-cyan {
+  text-shadow: 0 0 8px rgba(0, 242, 255, 0.7);
+}
+
+.animate-pulse-red {
+  animation: pulseRed 2s ease-in-out infinite;
+}
+@keyframes pulseRed {
+  0%,
+  100% {
+    box-shadow: inset 0 0 120px rgba(255, 77, 77, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 220px rgba(255, 77, 77, 0.35);
+  }
+}
+
+.debug-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 242, 255, 0.4);
+  color: #00f2ff;
+  transition: background 0.15s ease;
+}
+.debug-btn:hover {
+  background: rgba(0, 242, 255, 0.1);
+}
