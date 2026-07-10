@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "id": "scavenger",
+    "title": "月面清道夫",
+    "schema_version": "1.0",
+    "mode": "coop",
+    "round_sec": 60
+  },
+  "map": {
+    "frame": "table_1_2m",
+    "grid": [12, 12],
+    "zones": [
+      { "id": "dropzone", "kind": "base", "center": [6, 6] },
+      { "id": "field", "kind": "resource", "center": [6, 3] }
+    ]
+  },
+  "factions": [
+    { "id": "crew", "kind": "player_team", "members": ["p1", "p2", "p3", "p4"] },
+    { "id": "moon", "kind": "director" }
+  ],
+  "relationships": {
+    "crew": { "moon": "neutral" }
+  },
+  "director": {
+    "alignment": { "crew": "neutral" },
+    "events": [
+      {
+        "id": "scatter",
+        "when": "phase == running",
+        "cooldown_sec": 10,
+        "requires_capability": "Manipulator",
+        "do": { "actuator": "arm", "action": "drop", "target": "field" }
+      }
+    ]
+  },
+  "actuators": [
+    { "id": "arm", "capability": "Manipulator", "select": { "any": true },
+      "safety": { "workspace": "full_map", "max_force": "low", "safe_mode": true } }
+  ],
+  "sensors": [
+    { "id": "mic", "capability": "VoiceIntent" },
+    { "id": "loc", "capability": "PoseSource" }
+  ],
+  "units": [
+    {
+      "type": "rover",
+      "faction": "crew",
+      "count": 4,
+      "requires": ["Mover"],
+      "behaviors": {
+        "collect_resource": 1.2,
+        "return_and_repair": 0.5,
+        "explore_unknown": 0.8
+      }
+    }
+  ],
+  "inputs": {
+    "voice": {
+      "enabled": true,
+      "action_space": ["move_to", "collect", "return_base", "stop"]
+    }
+  },
+  "rules": [
+    { "id": "win", "when": "faction.crew.score >= 20",
+      "then": [ { "end_game": { "winner": "crew" } } ] }
+  ],
+  "tuning": { "round_sec": 60 }
+}

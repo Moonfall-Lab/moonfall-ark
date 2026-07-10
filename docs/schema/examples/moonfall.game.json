@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "id": "moonfall",
+    "title": "探月方舟",
+    "schema_version": "1.0",
+    "mode": "coop",
+    "players": { "min": 1, "max": 4 },
+    "round_sec": [720, 900]
+  },
+  "map": {
+    "frame": "table_1_2m",
+    "grid": [12, 12],
+    "zones": [
+      { "id": "base", "kind": "base", "center": [6, 6] },
+      { "id": "resource_ne", "kind": "resource", "center": [9, 2] },
+      { "id": "resource_sw", "kind": "resource", "center": [2, 9] },
+      { "id": "relic_nw", "kind": "relic", "center": [2, 2] },
+      { "id": "relic_se", "kind": "relic", "center": [9, 9] },
+      { "id": "dust_center", "kind": "hazard", "center": [6, 3], "dynamic": true }
+    ]
+  },
+  "factions": [
+    { "id": "survivors", "kind": "player_team", "members": ["p1", "p2", "p3", "p4"] },
+    { "id": "moon", "kind": "director" }
+  ],
+  "relationships": {
+    "survivors": { "moon": "enemy" }
+  },
+  "director": {
+    "alignment": { "survivors": "hostile" },
+    "tendency_sources": ["random", "biosignal", "prayer", "balance"],
+    "events": [
+      {
+        "id": "drop_dust",
+        "when": "moon_rage >= 0.5 and not boss_mode",
+        "requires_capability": "Manipulator",
+        "cooldown_sec": 8,
+        "do": { "actuator": "arm", "action": "drop", "target": "dust_center", "intensity": "moon_rage" }
+      },
+      {
+        "id": "hover_warning",
+        "when": "boss_mode and moon_rage < 0.7",
+        "do": { "actuator": "arm", "action": "hover_warning", "target": "base" }
+      },
+      {
+        "id": "strike",
+        "when": "boss_mode and moon_rage >= 0.7",
+        "do": { "actuator": "arm", "action": "strike", "target": "base", "intensity": "moon_rage" }
+      }
+    ]
+  },
+  "actuators": [
+    { "id": "arm", "capability": "Manipulator", "select": { "any": true },
+      "safety": { "workspace": "full_map", "max_force": "low", "safe_mode": true } },
+    { "id": "narrator", "capability": "Presenter", "select": { "any": true } }
+  ],
+  "sensors": [
+    { "id": "hr", "capability": "BioSignalSource", "per": "player" },
+    { "id": "mic", "capability": "VoiceIntent" },
+    { "id": "loc", "capability": "PoseSource" }
+  ],
+  "units": [
+    {
+      "type": "rover",
+      "faction": "survivors",
+      "count": 4,
+      "requires": ["Mover"],
+      "behaviors": {
+        "collect_resource": 1.0,
+        "pickup_relic": 0.8,
+        "return_and_repair": 1.0,
+        "evade_hazard": 1.2,
+        "explore_unknown": 0.6
+      },
+      "tuning": { "hp": 50, "decide_every_sec": 2 }
+    }
+  ],
+  "inputs": {
+    "cards": {
+      "energy": { "max_hand": 3, "regen_per_sec": 1.0 },
+      "deck": [
+        { "id": "resource_priority", "cost": 2, "effect": { "boost": { "collect_resource": 0.8 }, "duration_sec": 20 } },
+        { "id": "rally", "cost": 3, "effect": { "boost": { "escort": 1.0 }, "targets": "all_own" } },
+        { "id": "dash", "cost": 1, "effect": { "set": { "speed": 1.5 }, "duration_sec": 8 } }
+      ],
+      "relic_cards": [
+        { "id": "emp", "cost": 4, "once": true, "effect": { "disable_actuator": "arm", "duration_sec": 6 } }
+      ]
+    },
+    "voice": {
+      "enabled": true,
+      "action_space": ["move_to", "collect", "escort", "avoid_and_move", "return_base", "stop"],
+      "also_as_prayer": true
+    },
+    "biosignal": {
+      "normalize": "per_player_baseline",
+      "calibration": { "seconds": 30 },
+      "mappings": [
+        { "when": "team_avg_stress > 0.7", "then": [ { "trigger_event": "drop_dust" } ] },
+        { "when": "team_avg_stress < 0.2 for 20s", "then": [ { "set": { "moon_rage": 0.0 } } ] }
+      ],
+      "fallback": { "no_device": { "drive_rage_by": "game_progress", "prayer": "manual_button" } }
+    }
+  },
+  "rules": [
+    { "id": "enter_boss", "when": "fuel >= tuning.boss_at", "once": true,
+      "then": [ { "set": { "boss_mode": true } }, { "emit_event": { "type": "enter_boss", "message": "进入 Boss 战" } } ] },
+    { "id": "win", "when": "fuel >= tuning.fuel_win",
+      "then": [ { "end_game": { "winner": "survivors" } } ] },
+    { "id": "lose", "when": "core_hp <= 0",
+      "then": [ { "end_game": { "winner": "moon" } } ] }
+  ],
+  "tuning": { "core_hp": 100, "fuel_win": 100, "boss_at": 70, "energy_regen": 1.0, "round_sec": 900, "rage_scale": 40 }
+}

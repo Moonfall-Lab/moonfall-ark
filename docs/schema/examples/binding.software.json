@@ -1,0 +1,12 @@
+{
+  "profile": "software",
+  "note": "纯软件版：全部能力走模拟驱动，无需任何硬件。游戏配置不变。",
+  "bindings": {
+    "Mover":           { "tier": "simulated", "driver": "canvas_rover" },
+    "Manipulator":     { "tier": "simulated", "driver": "canvas_arm" },
+    "Presenter":       { "tier": "simulated", "driver": "screen_avatar" },
+    "BioSignalSource": { "tier": "simulated", "driver": "webcam_rppg", "alt": ["manual_input", "synthetic"] },
+    "VoiceIntent":     { "tier": "simulated", "driver": "text_or_mic" },
+    "PoseSource":      { "tier": "simulated", "driver": "virtual_grid" }
+  }
+}

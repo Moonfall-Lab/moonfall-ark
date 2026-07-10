@@ -1,0 +1,520 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moonfall.dev/schema/game_config.schema.json",
+  "title": "Embodied AI Game Config",
+  "description": "一份配置定义一个具身 AI 游戏。运行时是本 IR 的解释器。手写作者 / 低代码编辑器 / AI 生成器都产出通过本 schema 校验的同一份 artifact。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["meta", "map", "factions", "units", "rules"],
+  "properties": {
+    "meta": { "$ref": "#/$defs/meta" },
+    "flow": { "$ref": "#/$defs/flow" },
+    "vars": { "type": "array", "items": { "$ref": "#/$defs/var_decl" } },
+    "map": { "$ref": "#/$defs/map" },
+    "factions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/faction" }
+    },
+    "relationships": { "$ref": "#/$defs/relationships" },
+    "director": { "$ref": "#/$defs/director" },
+    "actuators": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/actuator" }
+    },
+    "sensors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sensor" }
+    },
+    "units": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/unit" }
+    },
+    "inputs": { "$ref": "#/$defs/inputs" },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rule" }
+    },
+    "tuning": { "$ref": "#/$defs/tuning" }
+  },
+
+  "$defs": {
+
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "小写蛇形命名，用作 id / 引用键。"
+    },
+
+    "capability_name": {
+      "description": "内置六类为闭合枚举；注册的扩展能力可用任意 PascalCase 名（通用扩展点）。",
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": ["Mover", "Manipulator", "Presenter", "BioSignalSource", "VoiceIntent", "PoseSource"]
+        },
+        { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$" }
+      ]
+    },
+
+    "expression": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "when/intensity 等表达式的字符串形式。结构由本 schema 校验，语义由引擎的 DSL 求值器单独校验。可引用：vars 声明的变量（global 用 <id>；faction 用 faction.<fid>.<id>；unit 用 unit.<uid>.<id>）、phase、alignment[f]、relationship(a,b)、tuning.*；函数 avg/count/max/min/dist/in_zone(unit,zone)/leader(var)/calm_streak(f)/faction_base(f)。"
+    },
+
+    "duration_clause": {
+      "type": "string",
+      "pattern": "^for\\s+\\d+s$",
+      "$comment": "如 'for 20s'：持续满足才触发。"
+    },
+
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "schema_version"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "title": { "type": "string" },
+        "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+$" },
+        "mode": {
+          "type": "string",
+          "enum": ["coop", "pvp", "ffa"],
+          "description": "只是默认阵营布局的语法糖；真实关系由 relationships 决定。"
+        },
+        "players": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "integer", "minimum": 1 },
+            "max": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "round_sec": {
+          "oneOf": [
+            { "type": "number", "exclusiveMinimum": 0 },
+            {
+              "type": "array",
+              "items": { "type": "number", "exclusiveMinimum": 0 },
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "[min, max] 区间。"
+            }
+          ]
+        }
+      }
+    },
+
+    "map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grid", "zones"],
+      "properties": {
+        "frame": { "type": "string", "description": "世界坐标系标定名，如 table_1_2m。" },
+        "grid": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "zones": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/zone" }
+        }
+      }
+    },
+
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "对局节奏。realtime = 连续实时；turn_based = 回合制，走 phases 列出的阶段；hybrid = 实时 + 阶段性结算。",
+      "properties": {
+        "type": { "type": "string", "enum": ["realtime", "turn_based", "hybrid"] },
+        "turn_sec": {
+          "oneOf": [
+            { "type": "number", "exclusiveMinimum": 0 },
+            { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2 }
+          ]
+        },
+        "phases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" },
+          "description": "回合内阶段顺序，如 [draw, command, action, combat, moon, resolve]。阶段名可被 rules 的 when 引用（phase == combat）。"
+        }
+      }
+    },
+
+    "var_decl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "scope", "initial"],
+      "description": "声明一个可变状态变量。scope 决定它是全局一份、每阵营一份、还是每单位一份。rules/DSL 通过 <id>（global）、faction.<fid>.<id>（faction）、unit.<uid>.<id>（unit）引用。",
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "scope": { "type": "string", "enum": ["global", "faction", "unit"] },
+        "initial": { "type": "number" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "note": { "type": "string" }
+      }
+    },
+
+    "zone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "kind": {
+          "type": "string",
+          "enum": ["base", "resource", "relic", "hazard", "trap", "obstacle", "neutral", "custom"]
+        },
+        "center": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "dynamic": {
+          "type": "boolean",
+          "description": "true 表示该区域可被执行器动态增删/扩张（如月尘带）。"
+        }
+      }
+    },
+
+    "faction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "kind": {
+          "type": "string",
+          "enum": ["player_team", "director", "npc"]
+        },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" },
+          "description": "玩家 id 列表（player_team 时）。"
+        }
+      }
+    },
+
+    "relationships": {
+      "type": "object",
+      "description": "阵营关系矩阵，对局内可由 set_relationship 动态改写；缺省视为 neutral。",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string",
+          "enum": ["friendly", "enemy", "neutral"]
+        }
+      }
+    },
+
+    "director": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "type": "object",
+          "description": "对各阵营立场，可由 set_alignment 漂移。",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["hostile", "neutral", "benevolent"]
+          }
+        },
+        "tendency_sources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["random", "biosignal", "prayer", "balance"]
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/director_event" }
+        }
+      }
+    },
+
+    "director_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "when", "do"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "when": { "$ref": "#/$defs/expression" },
+        "requires_capability": { "$ref": "#/$defs/capability_name" },
+        "cooldown_sec": { "type": "number", "minimum": 0 },
+        "once": { "type": "boolean" },
+        "do": { "$ref": "#/$defs/actuator_call" }
+      }
+    },
+
+    "actuator_call": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actuator", "action"],
+      "properties": {
+        "actuator": { "$ref": "#/$defs/identifier" },
+        "action": { "type": "string", "description": "该执行器所属能力声明的动作名。" },
+        "target": { "type": "string", "description": "zone id / unit id / 表达式 faction_base(f)。" },
+        "intensity": {
+          "oneOf": [
+            { "type": "number" },
+            { "$ref": "#/$defs/expression" }
+          ]
+        }
+      }
+    },
+
+    "actuator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "capability"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "capability": { "$ref": "#/$defs/capability_name" },
+        "select": {
+          "type": "object",
+          "description": "绑定选择器：从声明该能力的驱动里选一个。",
+          "additionalProperties": true
+        },
+        "safety": {
+          "type": "object",
+          "description": "配置只能收紧、不能放宽能力自带的安全壳。",
+          "additionalProperties": true
+        }
+      }
+    },
+
+    "sensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "capability"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "capability": { "$ref": "#/$defs/capability_name" },
+        "per": {
+          "type": "string",
+          "enum": ["player", "game"],
+          "description": "per: player 时每玩家一个实例（如心率）。"
+        },
+        "select": { "type": "object", "additionalProperties": true }
+      }
+    },
+
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "faction"],
+      "properties": {
+        "type": { "$ref": "#/$defs/identifier" },
+        "faction": { "$ref": "#/$defs/identifier" },
+        "count": { "type": "integer", "minimum": 1, "default": 1 },
+        "requires": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capability_name" },
+          "description": "单位所需能力；决定哪些行为对它可用。"
+        },
+        "behaviors": {
+          "type": "object",
+          "description": "从行为库挑 + 加权：behavior_id -> 基线权重。",
+          "additionalProperties": { "type": "number" }
+        },
+        "tuning": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        }
+      }
+    },
+
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cards": { "$ref": "#/$defs/cards" },
+        "voice": { "$ref": "#/$defs/voice" },
+        "biosignal": { "$ref": "#/$defs/biosignal" }
+      }
+    },
+
+    "cards": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "energy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_hand": { "type": "integer", "minimum": 1 },
+            "regen_per_sec": { "type": "number", "minimum": 0 }
+          }
+        },
+        "deck": { "type": "array", "items": { "$ref": "#/$defs/card" } },
+        "relic_cards": { "type": "array", "items": { "$ref": "#/$defs/card" } }
+      }
+    },
+
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "effect"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "cost": { "type": "number", "minimum": 0 },
+        "once": { "type": "boolean" },
+        "effect": {
+          "type": "object",
+          "description": "卡牌效果。boost 改行为权重；set/adjust 改状态；disable_actuator 临时禁用执行器。",
+          "additionalProperties": true
+        }
+      }
+    },
+
+    "voice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "action_space": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "闭合动作空间；VoiceIntent 只保证解析到这个集合内。"
+        },
+        "also_as_prayer": { "type": "boolean" }
+      }
+    },
+
+    "biosignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "normalize": {
+          "type": "string",
+          "enum": ["per_player_baseline", "absolute"]
+        },
+        "calibration": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "seconds": { "type": "number", "minimum": 0 } }
+        },
+        "mappings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/when_then" }
+        },
+        "fallback": {
+          "type": "object",
+          "description": "无手表模式等降级策略。",
+          "additionalProperties": true
+        }
+      }
+    },
+
+    "for_each": {
+      "description": "该规则对谁逐个检查——决定表达式里 self 指谁。faction=每阵营一次；unit=每单位一次；player=每玩家一次；也可写具体单位类型名（如 rover）。省略则规则只判一次（self 不可用）。",
+      "anyOf": [
+        { "type": "string", "enum": ["faction", "unit", "player", "world"] },
+        { "$ref": "#/$defs/identifier" }
+      ]
+    },
+
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "when", "then"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "for_each": { "$ref": "#/$defs/for_each" },
+        "when": { "$ref": "#/$defs/expression" },
+        "once": { "type": "boolean" },
+        "cooldown_sec": { "type": "number", "minimum": 0 },
+        "then": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+
+    "when_then": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["when", "then"],
+      "properties": {
+        "when": { "$ref": "#/$defs/expression" },
+        "then": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+
+    "action": {
+      "description": "闭合动作词表：每个动作对象恰含一个已知动作键。",
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "set": { "type": "object", "additionalProperties": true },
+        "adjust": { "type": "object", "additionalProperties": true },
+        "emit_event": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "type": "string" },
+            "message": { "type": "string" }
+          }
+        },
+        "end_game": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["winner"],
+          "properties": { "winner": { "$ref": "#/$defs/identifier" } }
+        },
+        "trigger_event": { "type": "string", "description": "director_event 的 id。" },
+        "trigger_actuator": { "$ref": "#/$defs/actuator_call" },
+        "set_relationship": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["a", "b", "value"],
+          "properties": {
+            "a": { "$ref": "#/$defs/identifier" },
+            "b": { "$ref": "#/$defs/identifier" },
+            "value": { "type": "string", "enum": ["friendly", "enemy", "neutral"] }
+          }
+        },
+        "set_alignment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["faction", "value"],
+          "properties": {
+            "faction": { "$ref": "#/$defs/identifier" },
+            "value": { "type": "string", "enum": ["hostile", "neutral", "benevolent"] }
+          }
+        },
+        "spawn": { "type": "object", "additionalProperties": true },
+        "despawn": { "type": "object", "additionalProperties": true },
+        "lock_rank": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["faction"],
+          "description": "为该阵营锁定下一个可用名次（升空排名）。用于 FFA 竞速。",
+          "properties": { "faction": { "$ref": "#/$defs/identifier" } }
+        }
+      }
+    },
+
+    "tuning": {
+      "type": "object",
+      "description": "全局可现场调的数值旋钮。",
+      "additionalProperties": { "type": "number" }
+    }
+  }
+}

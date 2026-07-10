@@ -1,0 +1,12 @@
+{
+  "profile": "physical",
+  "note": "赛场硬件版：能力接到真实设备驱动。游戏配置与软件版完全相同。",
+  "bindings": {
+    "Mover":           { "tier": "physical", "driver": "esp32_rover" },
+    "Manipulator":     { "tier": "physical", "driver": "piper_arm" },
+    "Presenter":       { "tier": "physical", "driver": "humanoid", "note": "产品可换回 screen_avatar" },
+    "BioSignalSource": { "tier": "physical", "driver": "ble_0x180D" },
+    "VoiceIntent":     { "tier": "physical", "driver": "mic_asr" },
+    "PoseSource":      { "tier": "physical", "driver": "uwb_apriltag_fusion" }
+  }
+}

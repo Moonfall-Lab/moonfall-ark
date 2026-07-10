@@ -1,0 +1,209 @@
+{
+  "meta": {
+    "id": "moonfall_mvp",
+    "title": "MoonFall：逃离月球 (MVP)",
+    "schema_version": "1.0",
+    "mode": "ffa",
+    "players": { "min": 4, "max": 4 },
+    "round_sec": [720, 900]
+  },
+
+  "flow": {
+    "type": "turn_based",
+    "turn_sec": [60, 90],
+    "phases": ["draw", "command", "action", "combat", "moon", "resolve"]
+  },
+
+  "vars": [
+    { "id": "fuel",      "scope": "faction", "initial": 0, "min": 0, "max": 5, "note": "燃料槽，集满 5 可点火" },
+    { "id": "ship_hp",   "scope": "faction", "initial": 3, "min": 0, "max": 3, "note": "飞船 HP，归零坠毁不能升空" },
+    { "id": "shield",    "scope": "faction", "initial": 0, "min": 0, "max": 1, "note": "紧急护盾，抵挡 1 次攻击/灾难" },
+    { "id": "jammed",    "scope": "faction", "initial": 0, "min": 0, "max": 1, "note": "被发射干扰，需回船清除后才能再点火" },
+    { "id": "declaring_launch", "scope": "faction", "initial": 0, "min": 0, "max": 1, "note": "持久 flag：已宣布点火、等待判定（由 declare_launch 事件置 1）" },
+    { "id": "launched",  "scope": "faction", "initial": 0, "min": 0, "max": 1, "note": "是否已成功升空并锁定排名" },
+    { "id": "crashed",   "scope": "faction", "initial": 0, "min": 0, "max": 1, "note": "持久 flag：飞船 HP 归零坠毁" },
+    { "id": "robot_hp",  "scope": "unit",    "initial": 3, "min": 0, "max": 3, "note": "小机器人 HP" },
+    { "id": "moon_rage", "scope": "global",  "initial": 0, "min": 0, "max": 100, "note": "月球狂暴度 0-100，四档" }
+  ],
+
+  "map": {
+    "frame": "table_1_2m",
+    "grid": [12, 12],
+    "zones": [
+      { "id": "ship_a", "kind": "base", "center": [1, 1] },
+      { "id": "ship_b", "kind": "base", "center": [11, 1] },
+      { "id": "ship_c", "kind": "base", "center": [1, 11] },
+      { "id": "ship_d", "kind": "base", "center": [11, 11] },
+      { "id": "resource_left",  "kind": "resource", "center": [3, 6] },
+      { "id": "resource_right", "kind": "resource", "center": [9, 6] },
+      { "id": "central_hi",     "kind": "resource", "center": [6, 6] },
+      { "id": "relic_top",    "kind": "relic", "center": [6, 2] },
+      { "id": "relic_bottom", "kind": "relic", "center": [6, 10] },
+      { "id": "dust_area",    "kind": "hazard", "center": [4, 8], "dynamic": true },
+      { "id": "meteor_area",  "kind": "obstacle", "center": [3, 8], "dynamic": true },
+      { "id": "jam_area",     "kind": "trap", "center": [8, 8], "dynamic": true }
+    ]
+  },
+
+  "factions": [
+    { "id": "pa", "kind": "player_team", "members": ["p1"] },
+    { "id": "pb", "kind": "player_team", "members": ["p2"] },
+    { "id": "pc", "kind": "player_team", "members": ["p3"] },
+    { "id": "pd", "kind": "player_team", "members": ["p4"] },
+    { "id": "moon", "kind": "director" }
+  ],
+
+  "relationships": {
+    "pa": { "pb": "enemy", "pc": "enemy", "pd": "enemy", "moon": "enemy" },
+    "pb": { "pa": "enemy", "pc": "enemy", "pd": "enemy", "moon": "enemy" },
+    "pc": { "pa": "enemy", "pb": "enemy", "pd": "enemy", "moon": "enemy" },
+    "pd": { "pa": "enemy", "pb": "enemy", "pc": "enemy", "moon": "enemy" }
+  },
+
+  "director": {
+    "alignment": { "pa": "neutral", "pb": "neutral", "pc": "neutral", "pd": "neutral" },
+    "tendency_sources": ["biosignal", "balance", "prayer", "random"],
+    "events": [
+      {
+        "id": "dust_storm",
+        "when": "moon_rage >= 30",
+        "requires_capability": "Manipulator",
+        "cooldown_sec": 60,
+        "do": { "actuator": "arm", "action": "drop_dust", "target": "dust_area", "intensity": "moon_rage" }
+      },
+      {
+        "id": "meteor_fall",
+        "when": "moon_rage >= 60 or max(faction.*.fuel) >= 4",
+        "requires_capability": "Manipulator",
+        "cooldown_sec": 60,
+        "do": { "actuator": "arm", "action": "place_meteor", "target": "meteor_area" }
+      },
+      {
+        "id": "central_supply",
+        "when": "moon_rage < 30",
+        "requires_capability": "Manipulator",
+        "cooldown_sec": 120,
+        "do": { "actuator": "arm", "action": "drop_fuel", "target": "central_hi" }
+      },
+      {
+        "id": "launch_jam",
+        "when": "count(faction.*.declaring_launch) >= 1 or moon_rage >= 80",
+        "requires_capability": "Manipulator",
+        "do": { "actuator": "arm", "action": "place_jammer", "target": "jam_area" }
+      }
+    ]
+  },
+
+  "actuators": [
+    { "id": "arm", "capability": "Manipulator", "select": { "any": true },
+      "safety": { "workspace": "full_map", "max_force": "low", "safe_mode": true,
+                  "no_drop": ["robot_current_cell", "ship_body", "player_hands", "route_blocking"] } },
+    { "id": "narrator", "capability": "Presenter", "select": { "any": true } }
+  ],
+
+  "sensors": [
+    { "id": "hr",  "capability": "BioSignalSource", "per": "player" },
+    { "id": "mic", "capability": "VoiceIntent" },
+    { "id": "loc", "capability": "PoseSource" }
+  ],
+
+  "units": [
+    { "type": "rover", "faction": "pa", "count": 1, "requires": ["Mover"],
+      "behaviors": { "collect_fuel": 1.0, "return_and_settle": 1.0, "attack_enemy_ship": 0.6,
+                     "return_and_repair": 1.0, "explore_relic": 0.6, "ignition_confirm": 2.0 },
+      "tuning": { "decide_every_sec": 2 } },
+    { "type": "rover", "faction": "pb", "count": 1, "requires": ["Mover"],
+      "behaviors": { "collect_fuel": 1.0, "return_and_settle": 1.0, "attack_enemy_ship": 0.6,
+                     "return_and_repair": 1.0, "explore_relic": 0.6, "ignition_confirm": 2.0 } },
+    { "type": "rover", "faction": "pc", "count": 1, "requires": ["Mover"],
+      "behaviors": { "collect_fuel": 1.0, "return_and_settle": 1.0, "attack_enemy_ship": 0.6,
+                     "return_and_repair": 1.0, "explore_relic": 0.6, "ignition_confirm": 2.0 } },
+    { "type": "rover", "faction": "pd", "count": 1, "requires": ["Mover"],
+      "behaviors": { "collect_fuel": 1.0, "return_and_settle": 1.0, "attack_enemy_ship": 0.6,
+                     "return_and_repair": 1.0, "explore_relic": 0.6, "ignition_confirm": 2.0 } }
+  ],
+
+  "inputs": {
+    "cards": {
+      "energy": { "max_hand": 3, "regen_per_sec": 0 },
+      "deck": [
+        { "id": "collect_priority", "effect": { "boost": { "collect_fuel": 1.5 }, "kind": "behavior" } },
+        { "id": "return_settle",    "effect": { "boost": { "return_and_settle": 1.5 }, "kind": "behavior" } },
+        { "id": "explore_relic",    "effect": { "boost": { "explore_relic": 1.5 }, "on_arrive": "grant_relic_card", "kind": "behavior" } },
+        { "id": "ignition_protocol","effect": { "requires": "self.fuel >= 5", "boost": { "ignition_confirm": 3.0 }, "kind": "behavior" } },
+        { "id": "moonrock_strike",  "effect": { "boost": { "attack_enemy_ship": 1.5 }, "on_hit": { "target_ship_hp": -1, "if_leader_extra": { "target_fuel": -1 } }, "kind": "behavior" } },
+        { "id": "fuel_raid",        "effect": { "boost": { "attack_enemy_ship": 1.5 }, "on_hit": { "target_fuel": -1, "self_fuel": 1 }, "kind": "behavior" } }
+      ],
+      "relic_cards": [
+        { "id": "teleport_steal",  "once": true, "effect": { "steal_hand": 1, "kind": "relic" } },
+        { "id": "dust_ward",       "once": true, "effect": { "immune": "dust", "duration": "1_turn", "kind": "relic" } },
+        { "id": "ark_repair_core", "once": true, "effect": { "adjust": { "self.ship_hp": 1 }, "kind": "relic" } },
+        { "id": "concurrent_ops",  "once": true, "effect": { "allow_multi_behavior_card": true, "duration": "1_turn", "kind": "relic" } }
+      ]
+    },
+    "voice": {
+      "enabled": true,
+      "action_space": ["move_to", "collect", "attack", "return_base", "repair", "ignition_confirm", "stop"],
+      "also_as_prayer": true
+    },
+    "biosignal": {
+      "normalize": "per_player_baseline",
+      "calibration": { "seconds": 30 },
+      "mappings": [
+        { "when": "team_avg_stress_delta > 0",
+          "then": [ { "adjust": { "moon_rage": 10 } } ] },
+        { "when": "team_avg_stress_delta < 0",
+          "then": [ { "adjust": { "moon_rage": -5 } } ] }
+      ],
+      "fallback": { "no_device": { "drive_rage_by": "turn_and_fuel_and_attacks" } }
+    }
+  },
+
+  "rules": [
+    { "id": "moon_wakes_boss", "when": "moon_rage >= 80", "once": true,
+      "then": [ { "emit_event": { "type": "boss", "message": "终局狂暴：优先干扰点火者" } } ] },
+
+    { "id": "dust_damage", "for_each": "rover",
+      "when": "in_zone(self, dust_area)",
+      "then": [ { "adjust": { "faction.of_self.ship_hp": -1 } } ] },
+    { "id": "dust_lingering", "for_each": "rover",
+      "when": "in_zone(self, dust_area) for 3s",
+      "then": [ { "adjust": { "unit.self.robot_hp": -1 } } ] },
+
+    { "id": "ignition_success", "for_each": "faction",
+      "when": "self.fuel >= 5 and self.ship_hp > 0 and self.jammed == 0 and self.declaring_launch == 1 and in_zone(self_rover, self_ship)",
+      "then": [ { "lock_rank": { "faction": "self" } }, { "set": { "faction.self.launched": 1 } },
+                { "trigger_actuator": { "actuator": "arm", "action": "place_rank_badge", "target": "self_ship" } } ] },
+
+    { "id": "ship_crashed", "for_each": "faction",
+      "when": "self.ship_hp <= 0 and self.crashed == 0",
+      "then": [ { "set": { "faction.self.crashed": 1 } },
+                { "trigger_actuator": { "actuator": "arm", "action": "place_crash_marker", "target": "self_ship" } } ] },
+
+    { "id": "betrayal_penalty",
+      "when": "event.type == attack_on_ally",
+      "then": [ { "adjust": { "moon_rage": 10 } },
+                { "trigger_actuator": { "actuator": "narrator", "action": "say", "target": "all" } } ] },
+
+    { "id": "game_end_all_resolved",
+      "when": "count(faction.*.launched) + count(faction.*.crashed) >= 4",
+      "then": [ { "end_game": { "winner": "moon" } } ] }
+  ],
+
+  "tuning": {
+    "fuel_to_launch": 5,
+    "ship_hp_max": 3,
+    "normal_resource_yield": 1,
+    "central_yield": 2,
+    "airdrop_yield": 1,
+    "normal_resource_stock": 5,
+    "central_stock": 3,
+    "relic_per_zone": 2,
+    "hand_max": 3,
+    "rage_wake": 30,
+    "rage_alert": 60,
+    "rage_anger": 80,
+    "betrayal_rage_penalty": 10,
+    "dust_linger_sec": 3
+  }
+}
