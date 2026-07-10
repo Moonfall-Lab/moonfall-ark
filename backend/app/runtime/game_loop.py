@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import asyncio
-from collections.abc import Awaitable, Callable
+from typing import Awaitable, Callable
 
 from app.core.constants import TOPIC_CMD_ARM, TOPIC_STATE_EVENT, TOPIC_STATE_WORLD
 from app.models.messages import RuntimeMessage, make_message
@@ -57,7 +59,6 @@ class GameLoop:
     async def _evaluate_rules_and_director(self) -> None:
         state = self.state_manager.get_state()
         for event in self.rule_engine.evaluate(state):
-            self.state_manager.add_event(event["message"])
             payload = {"event_type": event["type"], "message": event["message"]}
             log_event(state.session_id, TOPIC_STATE_EVENT, "runtime", payload)
             await self.broadcast(make_message(TOPIC_STATE_EVENT, payload))

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from uuid import uuid4
 
 from app.models.commands import RobotCommand, VoiceIntent
@@ -36,7 +38,8 @@ def get_moon_director() -> MoonDirector:
 
 
 def robot_command_from_intent(intent: VoiceIntent) -> RobotCommand:
-    robot_id = intent.robot_id or _robot_from_player(intent.player_id) or "r1"
+    unit = world_state_manager.unit_for_player(intent.player_id)
+    robot_id = intent.robot_id or (unit.id if unit is not None else None) or "r1"
     return RobotCommand(
         command_id=str(uuid4()),
         robot_id=robot_id,
@@ -45,8 +48,3 @@ def robot_command_from_intent(intent: VoiceIntent) -> RobotCommand:
         priority=max(0.5, min(2.0, intent.confidence * 2)),
         avoid=intent.avoid,
     )
-
-
-def _robot_from_player(player_id: str | None) -> str | None:
-    mapping = {"p1": "r1", "p2": "r2", "p3": "r3", "p4": "r4"}
-    return mapping.get(player_id or "")

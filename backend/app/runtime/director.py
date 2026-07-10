@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 from uuid import uuid4
 
@@ -11,20 +13,15 @@ class MoonDirector:
         self.safe_mode = bool(arm_config.get("safe_mode", True))
 
     def choose_arm_event(self, state: WorldState) -> ArmCommand | None:
-        if state.moon_rage < 0.5:
+        moon_rage = state.global_.moon_rage
+        if moon_rage < 50:
             return None
 
-        if state.boss_mode:
-            action = "strike" if state.moon_rage >= 0.7 else "hover_warning"
-            target_zone = "base"
-        else:
-            action = "drop_dust"
-            target_zone = "dust_center"
-
+        action = "strike" if moon_rage >= 80 else "drop_dust"
         return ArmCommand(
             command_id=str(uuid4()),
             action=action,
-            target_zone=target_zone,
-            intensity=max(0.5, state.moon_rage),
+            target_zone="dust_area",
+            intensity=max(0.5, min(1.0, moon_rage / 100)),
             safe_mode=self.safe_mode,
         )

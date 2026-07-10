@@ -17,6 +17,27 @@ CREATE TABLE IF NOT EXISTS event_logs (
     payload TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS functional_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    timestamp REAL NOT NULL,
+    action TEXT NOT NULL,
+    source TEXT NOT NULL,
+    payload TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ai_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    timestamp REAL NOT NULL,
+    action TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    input_text TEXT NOT NULL,
+    output_json TEXT,
+    success INTEGER NOT NULL,
+    error TEXT
+);
+
 CREATE TABLE IF NOT EXISTS llm_calls (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL,

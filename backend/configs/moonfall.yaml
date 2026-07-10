@@ -1,74 +1,129 @@
-game: moonfall
-mode: coop
+game_id: moonfall_mvp
+schema_version: "1.0"
+mode: ffa_race
+
+flow:
+  phases:
+    - prepare
+    - command
+    - action
+    - resolution
+    - ended
+  initial_phase: action
+
+global:
+  moon_rage: 0
+
+moon_tiers:
+  sleep: [0, 24]
+  alert: [25, 49]
+  anger: [50, 79]
+  endgame: [80, 100]
+
+vars:
+  faction:
+    fuel: 0
+    ship_hp: 3
+    shield: 0
+    jammed: 0
+    declaring_launch: 0
+    launched: 0
+    crashed: 0
+
+factions:
+  - id: pa
+    name: Pioneer A
+    players: [p1]
+  - id: pb
+    name: Pioneer B
+    players: [p2]
+  - id: pc
+    name: Pioneer C
+    players: [p3]
+  - id: pd
+    name: Pioneer D
+    players: [p4]
+
+units:
+  - id: r1
+    faction: pa
+    kind: rover
+    pose: { x: 3.0, y: 6.0, theta: 0.0 }
+    status: idle
+    carrying:
+  - id: r2
+    faction: pb
+    kind: rover
+    pose: { x: 8.0, y: 6.0, theta: 3.14 }
+    status: idle
+    carrying:
+  - id: r3
+    faction: pc
+    kind: rover
+    pose: { x: 6.0, y: 3.0, theta: 1.57 }
+    status: idle
+    carrying:
+  - id: r4
+    faction: pd
+    kind: rover
+    pose: { x: 6.0, y: 9.0, theta: -1.57 }
+    status: idle
+    carrying:
 
 map:
   grid: [12, 12]
   zones:
-    base:
-      name: 方舟基地
-      center: [6, 6]
-    resource_ne:
-      name: 东北资源区
-      center: [9, 2]
-    resource_sw:
-      name: 西南资源区
-      center: [2, 9]
-    relic_nw:
-      name: 西北遗迹区
-      center: [2, 2]
-    relic_se:
-      name: 东南遗迹区
-      center: [9, 9]
-    dust_center:
-      name: 中央月尘区
+    - id: dust_area
+      kind: hazard
+      name: Moon Dust Area
+      active: true
+      intensity: 0.3
       center: [6, 3]
+    - id: central_hi
+      kind: supply
+      name: Central Supply
+      active: true
+      intensity: 1.0
+      center: [6, 6]
+    - id: launch_pad
+      kind: base
+      name: Launch Pad
+      active: true
+      intensity: 1.0
+      center: [1, 1]
 
-players:
-  - id: p1
-    name: 玩家1
-    robot_id: r1
-  - id: p2
-    name: 玩家2
-    robot_id: r2
-  - id: p3
-    name: 玩家3
-    robot_id: r3
-  - id: p4
-    name: 玩家4
-    robot_id: r4
+inputs:
+  cards:
+    - id: collect_priority
+      name: Collect Priority
+      effect: Add one fuel to the player's faction.
+    - id: shield_boost
+      name: Shield Boost
+      effect: Add one shield to the player's faction.
+
+director:
+  events:
+    - id: enter_boss
+    - id: dust_storm
+    - id: meteor_fall
+    - id: central_supply
+    - id: launch_jam
+    - id: ignition_success
+    - id: ship_crashed
+    - id: betrayal
+    - id: rank_locked
+    - id: prayer_response
+    - id: voice_command
+    - id: card_input
 
 rules:
-  fuel_win: 100
-  boss_at: 70
-  core_hp: 100
-  moon_rage_threshold: 0.7
-  baseline_hr: 80
-  rage_scale: 40
-
-robots:
-  default_hp: 50
-  behavior_tick_sec: 2
-
-arm:
-  safe_mode: true
-  actions:
-    - drop_dust
-    - move_obstacle
-    - strike
-    - hover_warning
-    - home
-    - emergency_stop
-
-voice:
-  enabled: true
-  action_space:
-    - move_to
-    - collect
-    - escort
-    - avoid_and_move
-    - return_base
-    - stop
+  launch_fuel: 5
+  launch_ship_hp: 1
+  max_turn: 20
 
 heartbeat:
   baseline_seconds: 30
   rage_scale: 40
+
+arm:
+  safe_mode: true

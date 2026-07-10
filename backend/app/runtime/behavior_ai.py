@@ -1,33 +1,26 @@
+from __future__ import annotations
+
 from uuid import uuid4
 
 from app.models.commands import RobotCommand
-from app.models.world import RobotState, WorldState
+from app.models.world import UnitState, WorldState
 
 
 class BehaviorAI:
-    def choose_action(self, robot: RobotState, state: WorldState) -> RobotCommand:
-        if robot.hp < 30:
+    def choose_action(self, unit: UnitState, state: WorldState) -> RobotCommand:
+        if state.global_.moon_rage >= 80:
             return RobotCommand(
                 command_id=str(uuid4()),
-                robot_id=robot.robot_id,
-                action="return_base",
-                target_zone="base",
-                priority=2.0,
-            )
-
-        if state.moon_rage > 0.7:
-            return RobotCommand(
-                command_id=str(uuid4()),
-                robot_id=robot.robot_id,
+                robot_id=unit.id,
                 action="avoid_and_move",
-                target_zone="resource_ne",
+                target_zone="central_hi",
                 priority=1.5,
-                avoid=["dust_center"],
+                avoid=["dust_area"],
             )
 
         return RobotCommand(
             command_id=str(uuid4()),
-            robot_id=robot.robot_id,
-            action="move_to",
-            target_zone="resource_ne",
+            robot_id=unit.id,
+            action="collect",
+            target_zone="central_hi",
         )

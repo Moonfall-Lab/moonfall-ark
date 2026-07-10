@@ -1,37 +1,53 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
 
 
-class RobotState(BaseModel):
-    robot_id: str
-    hp: int = 50
-    battery: float = 100.0
+class Pose(BaseModel):
     x: float = 0.0
     y: float = 0.0
     theta: float = 0.0
+
+
+class GlobalState(BaseModel):
+    moon_rage: int = 0
+    moon_tier: str = "sleep"
+
+
+class FactionState(BaseModel):
+    id: str
+    players: list[str] = Field(default_factory=list)
+    rank: int | None = None
+    vars: dict[str, int | float | str] = Field(default_factory=dict)
+
+
+class UnitState(BaseModel):
+    id: str
+    faction: str
+    kind: str
+    pose: Pose = Field(default_factory=Pose)
     status: str = "idle"
-    target_zone: str | None = None
     carrying: str | None = None
 
 
-class PlayerState(BaseModel):
-    player_id: str
-    name: str | None = None
-    robot_id: str | None = None
-    heart_rate: int = 80
-    baseline_hr: int = 80
-    stress: float = 0.0
-    energy: float = 0.0
+class ZoneState(BaseModel):
+    id: str
+    kind: str
+    active: bool = True
+    intensity: float = 1.0
 
 
 class WorldState(BaseModel):
-    game_id: str = "moonfall"
     session_id: str
-    phase: str = "prepare"
-    fuel: float = 0.0
-    core_hp: int = 100
-    moon_rage: float = 0.0
-    boss_mode: bool = False
+    game_id: str = "moonfall_mvp"
+    schema_version: str = "1.0"
+    phase: str = "action"
+    turn: int = 1
+    global_: GlobalState = Field(default_factory=GlobalState, alias="global")
+    factions: list[FactionState] = Field(default_factory=list)
+    units: list[UnitState] = Field(default_factory=list)
+    zones: list[ZoneState] = Field(default_factory=list)
+    rank_order: list[str] = Field(default_factory=list)
     winner: str | None = None
-    robots: dict[str, RobotState] = Field(default_factory=dict)
-    players: dict[str, PlayerState] = Field(default_factory=dict)
-    current_events: list[str] = Field(default_factory=list)
+
+    model_config = {"populate_by_name": True}
