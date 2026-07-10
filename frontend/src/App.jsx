@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useGameData } from './lib/useGameData'
-import { THEME_STYLE } from './themes'
-import MapGrid from './components/MapGrid'
+import Scene3D from './components/Scene3D'
 import PlayerPanel from './components/PlayerPanel'
 import MoonRageMeter from './components/MoonRageMeter'
 import EventLog from './components/EventLog'
@@ -10,7 +9,6 @@ import RankBoard from './components/RankBoard'
 import DangerOverlay from './components/DangerOverlay'
 import DebugPanel from './components/DebugPanel'
 import LoadingScreen from './components/LoadingScreen'
-import ThemeSwitcher from './components/ThemeSwitcher'
 
 function StatusPill({ status }) {
   const map = {
@@ -29,14 +27,6 @@ function StatusPill({ status }) {
 export default function App() {
   const { config, state, events, status } = useGameData()
   const [showDebug, setShowDebug] = useState(false)
-  const [theme, setTheme] = useState(() => {
-    const s = localStorage.getItem('mf_theme')
-    return s === 'lunar' || s === 'pixel' ? s : 'lunar'
-  })
-
-  useEffect(() => {
-    localStorage.setItem('mf_theme', theme)
-  }, [theme])
 
   useEffect(() => {
     const onKey = (e) => {
@@ -51,41 +41,29 @@ export default function App() {
 
   if (!state || !config) {
     return (
-      <div data-theme={theme}>
+      <div data-theme="lunar">
         <LoadingScreen status={status} />
-        <ThemeSwitcher theme={theme} onChange={setTheme} />
       </div>
     )
   }
 
-  const ts = THEME_STYLE[theme] || THEME_STYLE.lunar
   const isEndgame = state.global?.moon_tier === 'endgame'
   const factions = state.factions || []
   const unitOf = (fid) => (state.units || []).find((u) => u.faction === fid)
 
   return (
     <div
-      data-theme={theme}
-      className={`relative w-screen h-screen overflow-hidden ${ts.scanlines ? 'scanlines' : ''} ${
-        isEndgame ? 'animate-pulse-red' : ''
-      }`}
+      data-theme="lunar"
+      className={`relative w-screen h-screen overflow-hidden scanlines ${isEndgame ? 'animate-pulse-red' : ''}`}
       style={{ background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-body)' }}
     >
+      {/* 3D 月面场景（可拖拽旋转 / 滚轮缩放 / 点击聚焦） */}
+      <Scene3D config={config} state={state} lastEvent={events[0]} />
+
       <StatusPill status={status} />
 
-      {/* 中央地图 */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <MapGrid
-          config={config}
-          units={state.units || []}
-          zones={state.zones || []}
-          tier={state.global?.moon_tier}
-          theme={theme}
-        />
-      </div>
-
       {/* 四角玩家面板 */}
-      <div className="absolute inset-0 p-5 pointer-events-none">
+      <div className="absolute inset-0 p-5 pointer-events-none z-20">
         <div className="flex flex-col justify-between h-full">
           <div className="flex justify-between items-start">
             <PlayerPanel faction={factions[0]} config={config} unit={unitOf(factions[0]?.id)} corner="top-left" />
@@ -99,7 +77,7 @@ export default function App() {
       </div>
 
       {/* 月球狂暴度 - 顶部居中 */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[34%] max-w-[520px] z-20">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[34%] max-w-[520px] z-20 pointer-events-none">
         <MoonRageMeter
           rage={state.global?.moon_rage ?? 0}
           tier={state.global?.moon_tier}
@@ -118,14 +96,16 @@ export default function App() {
         <EventLog events={events} />
       </div>
 
+      {/* 操作提示 */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 text-[10px] tracking-widest muted pointer-events-none">
+        拖拽旋转 · 滚轮缩放 · 点击建筑聚焦 · Ctrl+D 调试
+      </div>
+
       {/* 终局预警 */}
       <AnimatePresence>{isEndgame && <DangerOverlay />}</AnimatePresence>
 
       {/* 调试面板 Ctrl+D */}
       {showDebug && <DebugPanel state={state} status={status} />}
-
-      {/* 主题切换 */}
-      <ThemeSwitcher theme={theme} onChange={setTheme} />
     </div>
   )
 }

@@ -1,6 +1,14 @@
-# MoonFall 实时计分大屏
+# MoonFall 实时计分大屏（3D）
 
-React + Vite + Tailwind + Framer Motion。订阅后端 Runtime 的实时状态，渲染四人竞速大屏。不连后端也能用内置 mock 数据预览。
+React + Vite + Tailwind + Framer Motion + **three.js**。全屏 3D 月面场景 + HUD 覆盖层，订阅后端 Runtime 的实时状态。不连后端也能用内置 mock 数据预览。
+
+## 3D 场景
+
+- `src/three/MoonScene.js`：three.js 场景引擎（地形/模型/小车/特效/月怒氛围），`src/components/Scene3D.jsx` 是它的 React 壳。
+- 模型在 `public/assets/models/*.glb`，由原始 OBJ（每个 100~250MB）离线减面压缩而来（保 UV 聚类减面 + PBR 贴图打包，每个 4~8MB，共约 77MB）。
+- 区域映射：四角飞船=ship1~4（发射架姿态），资源区=资源站，中央高能=高能燃料站，遗迹=祭坛1/2，月尘=月尘投放装置，陨石=陨石，干扰区=程序化电弧塔。
+- 实时表现：小车平滑移动+月尘尾迹；宣布点火→飞船白光呼吸；发射→飞船升空+引擎粒子；坠毁→红光震颤；事件→冲击波环+光柱；月怒升级→全场变红+泛光增强+终局震屏。
+- 交互：拖拽旋转、滚轮缩放、点击建筑聚焦（拖拽后自动停止自转）。
 
 ## 运行
 
@@ -38,8 +46,11 @@ src/
     useGameData.js        WebSocket + config 拉取 + mock 兜底
     mock.js               离线演示数据源（结构与后端一致）
     factions.js           阵营配色
+  three/
+    MoonScene.js          three.js 3D 场景引擎
   components/
-    MapGrid.jsx           12×12 地图，SVG 渲染区域与小车
+    Scene3D.jsx           3D 场景 React 壳 + 资源加载进度
+    MapGrid.jsx           旧版 12×12 SVG 地图（已被 3D 场景替代，保留备用）
     PlayerPanel.jsx       玩家飞船面板：燃料/血量/心率/状态徽章
     MoonRageMeter.jsx     月球狂暴度仪表，四档 25/50/80
     HeartRateWave.jsx     Canvas 心率波形
