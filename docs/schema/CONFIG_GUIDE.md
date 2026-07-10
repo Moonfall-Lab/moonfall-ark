@@ -52,7 +52,7 @@ MVP 规则文档的每条机制，对应配置中的位置。Review 从这张表
 | 月尘进入船受伤 | `director.events.dust_storm`，`rules.dust_damage` | -1 |
 | 陨石格不可通行 | `director.events.meteor_fall`，zone `meteor_area` | — |
 | 发射干扰点火失败、需回船清除 | `director.events.launch_jam`，`vars.jammed`，`rules.ignition_success` | — |
-| 狂暴度 0-100 四档 | `vars.moon_rage`，`director.events` 的 when 阈值，`tuning` rage_* | 30/60/80 |
+| 狂暴度 0-100 四档 | `vars.moon_rage`，`director.events` 的 when 阈值，`tuning` rage_* | 25/50/80 |
 | 心率映射狂暴度，相对基线 | `sensors.hr`，`inputs.biosignal` | 基线 30s |
 | 无表保底模式 | `inputs.biosignal.fallback` | — |
 | 联盟 1 回合、背叛 +10 狂暴 | `relationships` 动态改写，`rules.betrayal_penalty`，`tuning.betrayal_rage_penalty` | +10 |
@@ -169,12 +169,12 @@ director:
   tendency_sources: [biosignal, balance, prayer, random]
   events:
     - id: dust_storm
-      when: "moon_rage >= 30"
+      when: "moon_rage >= 25"
       requires_capability: Manipulator
       cooldown_sec: 60
       do: { actuator: arm, action: drop_dust, target: dust_area, intensity: "moon_rage" }
     - id: central_supply
-      when: "moon_rage < 30"
+      when: "moon_rage < 25"
       do: { actuator: arm, action: drop_fuel, target: central_hi }
 ```
 
@@ -307,8 +307,8 @@ tuning:
   normal_resource_stock: 5
   central_stock: 3
   relic_per_zone: 2
-  rage_wake: 30
-  rage_alert: 60
+  rage_wake: 25
+  rage_alert: 50
   rage_anger: 80
   betrayal_rage_penalty: 10
   dust_linger_sec: 3
@@ -397,7 +397,7 @@ tuning:
 1. 升空链。`vars.fuel` 上限 5，`rules.ignition_success` 的四个 when 条件，行为 `ignition_confirm`，卡 `ignition_protocol` 是否齐全、数值正确。
 2. 收益数值。`tuning` 的 normal_resource_yield 1、central_yield 2、airdrop_yield 1 与规则一致否，初始库存 `*_stock` 呢。
 3. 伤害来源。敌方攻击 `on_hit`、月尘 `dust_damage`、干扰 `jammed` 三条路径是否都建模。机器人血量为可选玩法，不在默认清单内。
-4. 狂暴度四档。`director.events` 各 when 的 30/60/80 与 `tuning.rage_*` 对齐否，沉睡档投小燃料、终局档优先干扰点火者是否有对应事件。
+4. 狂暴度四档。`director.events` 各 when 的 25/50/80 与 `tuning.rage_*` 对齐否，沉睡档投小燃料、终局档优先干扰点火者是否有对应事件。
 5. 六个机械臂技能。技能 1 至 4 在 `director.events`，技能 5、6 在 `rules` 的 `trigger_actuator`，逐个核对触发条件与效果。
 6. 联盟与背叛。`relationships` 能改成 friendly 否，背叛 +10 狂暴的 `rules.betrayal_penalty` 在否。
 7. 心率。`biosignal` 的 30 秒基线、相对归一、无表 `fallback` 三项是否齐。
