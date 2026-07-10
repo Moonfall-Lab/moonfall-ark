@@ -5,36 +5,57 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.core.constants import ALLOWED_ACTIONS, ALLOWED_ROBOT_IDS, ALLOWED_ZONES
 from app.models.commands import VoiceIntent
 from app.services.llm_provider import LLMProvider
 
 
-SYSTEM_PROMPT = """你是 Moonfall Runtime 的语音指令解析器。
-你只能把玩家自然语言解析成 JSON，不要输出解释。
-允许动作 action 只能是：move_to, collect, escort, avoid_and_move, return_base, stop。
-允许 robot_id 只能是：r1, r2, r3, r4 或 null。
-允许 target_zone 只能是：base, resource_ne, resource_sw, relic_nw, relic_se, dust_center 或 null。
-输出 JSON 格式：
-{
-  "intent_type": "robot_command",
-  "player_id": "p1",
-  "robot_id": "r1",
-  "action": "move_to",
-  "target_zone": "resource_ne",
-  "avoid": ["dust_center"],
-  "confidence": 0.8
-}
-"""
+DEFAULT_ACTIONS = ["move_to", "collect", "attack", "return_base", "repair", "ignition_confirm", "stop"]
 
 
 class VoiceParser:
-    def __init__(self, llm_provider: LLMProvider | None = None) -> None:
+    """把玩家自然语言解析成机器人意图。允许的动作、区域、机器人 id 全部从加载的游戏配置派生，
+    不再写死常量，换配置即换游戏，语音也随之改变。"""
+
+    def __init__(self, llm_provider: LLMProvider | None = None, config: dict[str, Any] | None = None) -> None:
         self.llm_provider = llm_provider or LLMProvider()
+        config = config or {}
+
+        self._zones = [z for z in config.get("map", {}).get("zones", []) if z.get("id")]
+        self.allowed_zones = {z["id"] for z in self._zones}
+        self.allowed_robots = {u["id"] for u in config.get("units", []) if u.get("id")}
+
+        voice_cfg = config.get("inputs", {}).get("voice", {}) or {}
+        actions = voice_cfg.get("action_space") or DEFAULT_ACTIONS
+        self._actions = list(actions)
+        self.allowed_actions = set(self._actions)
+
+        self.system_prompt = self._build_prompt()
+
+    def _build_prompt(self) -> str:
+        actions = ", ".join(self._actions)
+        robots = ", ".join(sorted(self.allowed_robots)) or "r1"
+        zones = ", ".join(z["id"] for z in self._zones) or "无"
+        return (
+            "你是 Moonfall Runtime 的语音指令解析器。\n"
+            "你只能把玩家自然语言解析成 JSON，不要输出解释。\n"
+            f"允许动作 action 只能是：{actions}。\n"
+            f"允许 robot_id 只能是：{robots} 或 null。\n"
+            f"允许 target_zone 只能是：{zones} 或 null。\n"
+            "输出 JSON 格式：\n"
+            "{\n"
+            '  "intent_type": "robot_command",\n'
+            '  "player_id": "p1",\n'
+            '  "robot_id": "r1",\n'
+            '  "action": "move_to",\n'
+            '  "target_zone": null,\n'
+            '  "avoid": [],\n'
+            '  "confidence": 0.8\n'
+            "}\n"
+        )
 
     def parse(self, text: str, player_id: str | None = None) -> VoiceIntent:
         try:
-            llm_text = self.llm_provider.chat_json(SYSTEM_PROMPT, text)
+            llm_text = self.llm_provider.chat_json(self.system_prompt, text)
             parsed = self._load_json(llm_text)
             parsed.setdefault("player_id", player_id)
             intent = VoiceIntent.model_validate(parsed)
@@ -50,20 +71,21 @@ class VoiceParser:
         return json.loads(stripped)
 
     def _validate_intent(self, intent: VoiceIntent) -> None:
-        if intent.action not in ALLOWED_ACTIONS:
+        if intent.action not in self.allowed_actions:
             raise ValueError(f"invalid action: {intent.action}")
-        if intent.robot_id is not None and intent.robot_id not in ALLOWED_ROBOT_IDS:
+        if intent.robot_id is not None and intent.robot_id not in self.allowed_robots:
             raise ValueError(f"invalid robot_id: {intent.robot_id}")
-        if intent.target_zone is not None and intent.target_zone not in ALLOWED_ZONES:
+        if intent.target_zone is not None and intent.target_zone not in self.allowed_zones:
             raise ValueError(f"invalid target_zone: {intent.target_zone}")
         for zone_id in intent.avoid:
-            if zone_id not in ALLOWED_ZONES:
+            if zone_id not in self.allowed_zones:
                 raise ValueError(f"invalid avoid zone: {zone_id}")
 
     def _parse_by_rules(self, text: str, player_id: str | None) -> VoiceIntent:
         robot_id = self._find_robot(text) or self._robot_from_player(player_id)
         target_zone = self._find_zone(text)
-        avoid = ["dust_center"] if any(word in text for word in ("绕开", "避开", "月尘")) else []
+        hazard = self._zone_of_kind("hazard")
+        avoid = [hazard] if hazard and any(word in text for word in ("绕开", "避开", "月尘")) else []
         action = self._find_action(text, target_zone, avoid)
 
         try:
@@ -83,11 +105,22 @@ class VoiceParser:
                 intent_type="robot_command",
                 player_id=player_id,
                 robot_id=robot_id,
-                action="move_to",
-                target_zone=target_zone or "resource_ne",
-                avoid=avoid,
+                action=self._default_action(),
+                target_zone=None,
+                avoid=[],
                 confidence=0.3,
             )
+
+    def _default_action(self) -> str:
+        if "move_to" in self.allowed_actions:
+            return "move_to"
+        return self._actions[0] if self._actions else "move_to"
+
+    def _zone_of_kind(self, kind: str) -> str | None:
+        for zone in self._zones:
+            if zone.get("kind") == kind:
+                return zone["id"]
+        return None
 
     def _find_robot(self, text: str) -> str | None:
         robot_keywords = {
@@ -97,40 +130,41 @@ class VoiceParser:
             "r4": ("四号", "4号", "四号车", "4号车", "r4"),
         }
         for robot_id, words in robot_keywords.items():
-            if any(word in text for word in words):
+            if robot_id in self.allowed_robots and any(word in text for word in words):
                 return robot_id
         return None
 
     def _robot_from_player(self, player_id: str | None) -> str | None:
         mapping = {"p1": "r1", "p2": "r2", "p3": "r3", "p4": "r4"}
-        return mapping.get(player_id or "")
+        robot_id = mapping.get(player_id or "")
+        return robot_id if robot_id in self.allowed_robots else None
 
     def _find_zone(self, text: str) -> str | None:
-        if any(word in text for word in ("东北", "右上", "资源区", "资源", "东区")):
-            return "resource_ne"
-        if any(word in text for word in ("西南", "左下")):
-            return "resource_sw"
-        if any(word in text for word in ("基地", "回家", "维修")):
-            return "base"
-        if "东南" in text:
-            return "relic_se"
-        if any(word in text for word in ("遗迹", "西北")):
-            return "relic_nw"
-        if "月尘" in text:
-            return "dust_center"
+        if any(word in text for word in ("月尘", "灾难")):
+            zone = self._zone_of_kind("hazard")
+            if zone:
+                return zone
+        if any(word in text for word in ("中央", "中间", "补给", "资源", "燃料")):
+            zone = self._zone_of_kind("supply") or self._zone_of_kind("resource")
+            if zone:
+                return zone
+        if any(word in text for word in ("基地", "回家", "发射", "升空", "维修")):
+            zone = self._zone_of_kind("base")
+            if zone:
+                return zone
         return None
 
     def _find_action(self, text: str, target_zone: str | None, avoid: list[str]) -> str:
-        if "停" in text:
-            return "stop"
-        if any(word in text for word in ("回来", "返回", "回家")):
-            return "return_base"
-        if any(word in text for word in ("采集", "燃料")):
-            return "collect"
-        if "护送" in text:
-            return "escort"
-        if avoid:
-            return "avoid_and_move"
-        if target_zone:
-            return "move_to"
-        return "move_to"
+        candidates: list[tuple[tuple[str, ...], str]] = [
+            (("停",), "stop"),
+            (("回来", "返回", "回家"), "return_base"),
+            (("采集", "燃料"), "collect"),
+            (("攻击", "打", "炮击"), "attack"),
+            (("维修", "修"), "repair"),
+            (("点火", "升空"), "ignition_confirm"),
+            (("护送",), "escort"),
+        ]
+        for words, action in candidates:
+            if action in self.allowed_actions and any(word in text for word in words):
+                return action
+        return self._default_action()

@@ -11,7 +11,7 @@ from app.services.voice_parser import VoiceParser
 
 
 world_state_manager = WorldStateManager()
-voice_parser = VoiceParser()
+voice_parser = VoiceParser(config=world_state_manager.config)
 behavior_ai = BehaviorAI()
 rule_engine = RuleEngine(world_state_manager.config)
 moon_director = MoonDirector(world_state_manager.config)
