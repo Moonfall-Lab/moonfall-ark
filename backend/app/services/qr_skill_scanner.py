@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Protocol
 
 import yaml
 
@@ -56,3 +57,94 @@ class QrPresentationGate:
             else:
                 self._missing[value] = misses
         return emitted
+
+
+class DecoderBackend(Protocol):
+    def decode(self, frame: Any) -> set[str]: ...
+
+
+class OpenCvQrBackend:
+    def __init__(self):
+        import cv2
+
+        self.cv2 = cv2
+        self.detector = cv2.QRCodeDetector()
+
+    def decode(self, frame: Any) -> set[str]:
+        values: set[str] = set()
+        detected, decoded_info, points, _ = self.detector.detectAndDecodeMulti(frame)
+        if detected:
+            values.update(value.strip() for value in decoded_info if value.strip())
+        if values:
+            return values
+
+        value, single_points, _ = self.detector.detectAndDecode(frame)
+        if value.strip():
+            return {value.strip()}
+
+        retry_points = single_points if single_points is not None else points
+        if retry_points is None:
+            return set()
+        retry_image = self._build_retry_image(frame, retry_points)
+        retry_value, _, _ = self.detector.detectAndDecode(retry_image)
+        return {retry_value.strip()} if retry_value.strip() else set()
+
+    def _build_retry_image(self, frame: Any, points: Any) -> Any:
+        import numpy as np
+
+        flattened = np.asarray(points).reshape(-1, 2)
+        x_min, y_min = np.floor(flattened.min(axis=0)).astype(int)
+        x_max, y_max = np.ceil(flattened.max(axis=0)).astype(int)
+        width = max(1, x_max - x_min)
+        height = max(1, y_max - y_min)
+        pad_x = max(12, int(width * 0.2))
+        pad_y = max(12, int(height * 0.2))
+        frame_height, frame_width = frame.shape[:2]
+        x_min = max(0, x_min - pad_x)
+        y_min = max(0, y_min - pad_y)
+        x_max = min(frame_width, x_max + pad_x)
+        y_max = min(frame_height, y_max + pad_y)
+        crop = frame[y_min:y_max, x_min:x_max]
+        bordered = self.cv2.copyMakeBorder(
+            crop,
+            32,
+            32,
+            32,
+            32,
+            self.cv2.BORDER_CONSTANT,
+            value=255,
+        )
+        return self.cv2.resize(
+            bordered,
+            None,
+            fx=3,
+            fy=3,
+            interpolation=self.cv2.INTER_NEAREST,
+        )
+
+
+class ZxingQrBackend:
+    def decode(self, frame: Any) -> set[str]:
+        import zxingcpp
+
+        barcodes = zxingcpp.read_barcodes(
+            frame,
+            formats=zxingcpp.BarcodeFormat.QRCode,
+        )
+        return {barcode.text.strip() for barcode in barcodes if barcode.text.strip()}
+
+
+class QrDecoder:
+    def __init__(
+        self,
+        primary: DecoderBackend | None = None,
+        fallback: DecoderBackend | None = None,
+    ):
+        self.primary = primary if primary is not None else OpenCvQrBackend()
+        self.fallback = fallback if fallback is not None else ZxingQrBackend()
+
+    def decode(self, frame: Any) -> set[str]:
+        values = self.primary.decode(frame)
+        if values:
+            return values
+        return self.fallback.decode(frame)

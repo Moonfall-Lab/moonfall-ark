@@ -12,7 +12,10 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from app.services.qr_skill_scanner import (  # noqa: E402
+    OpenCvQrBackend,
+    QrDecoder,
     QrPresentationGate,
+    ZxingQrBackend,
     load_skill_allowlist,
 )
 
@@ -82,6 +85,72 @@ class QrPresentationGateTest(unittest.TestCase):
             gate.observe({"采集优先", "核心修复"}),
             ["采集优先"],
         )
+
+
+class StaticDecoderBackend:
+    def __init__(self, values):
+        self.values = set(values)
+        self.calls = 0
+
+    def decode(self, frame):
+        self.calls += 1
+        return set(self.values)
+
+
+class QrDecoderTest(unittest.TestCase):
+    def test_uses_primary_results_without_fallback(self):
+        primary = StaticDecoderBackend({"采集优先"})
+        fallback = StaticDecoderBackend({"不应调用"})
+        decoder = QrDecoder(primary=primary, fallback=fallback)
+
+        self.assertEqual(decoder.decode(object()), {"采集优先"})
+        self.assertEqual(primary.calls, 1)
+        self.assertEqual(fallback.calls, 0)
+
+    def test_uses_fallback_when_primary_has_no_text(self):
+        primary = StaticDecoderBackend(set())
+        fallback = StaticDecoderBackend({"神之祈愿"})
+        decoder = QrDecoder(primary=primary, fallback=fallback)
+
+        self.assertEqual(decoder.decode(object()), {"神之祈愿"})
+        self.assertEqual(primary.calls, 1)
+        self.assertEqual(fallback.calls, 1)
+
+
+class QrImageDecoderTest(unittest.TestCase):
+    def test_opencv_backend_decodes_generated_qr(self):
+        import cv2
+
+        image = cv2.QRCodeEncoder_create().encode("核心修复")
+
+        self.assertEqual(OpenCvQrBackend().decode(image), {"核心修复"})
+
+    def test_zxing_backend_decodes_generated_qr(self):
+        import cv2
+
+        image = cv2.QRCodeEncoder_create().encode("月尘护符")
+
+        self.assertEqual(ZxingQrBackend().decode(image), {"月尘护符"})
+
+    def test_default_decoder_builds_both_backends(self):
+        import cv2
+
+        image = cv2.QRCodeEncoder_create().encode("并发任务")
+
+        self.assertEqual(QrDecoder().decode(image), {"并发任务"})
+
+    @unittest.skipUnless(
+        Path(r"C:\Users\x\Desktop\git\卡牌\6.png").exists(),
+        "supplied card images are not available",
+    )
+    def test_roi_retry_decodes_divine_prayer_card(self):
+        import cv2
+        import numpy as np
+
+        path = Path(r"C:\Users\x\Desktop\git\卡牌\6.png")
+        image = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+        self.assertEqual(OpenCvQrBackend().decode(image), {"神之祈愿"})
 
 
 if __name__ == "__main__":
