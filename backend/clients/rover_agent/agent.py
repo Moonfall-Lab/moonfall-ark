@@ -24,6 +24,22 @@ from rover_agent.planner import planning_margin_cm
 from rover_agent.viz import load_params
 
 
+def parse_args(argv=None):
+    """Parse agent startup options without starting hardware resources."""
+    parser = argparse.ArgumentParser(description="rover_agent 主程序")
+    parser.add_argument("--params", default=None, help="params.yaml 路径")
+    parser.add_argument("--camera", type=int, default=0)
+    parser.add_argument("--config", default=None,
+                        help="游戏配置 json（读 map.zones 作障碍）")
+    parser.add_argument("--bridge", default=None,
+                        help="Runtime WebSocket 地址，如 ws://127.0.0.1:8000/ws")
+    parser.add_argument("--viz", action="store_true",
+                        help="开单窗口实景叠加（坐标/障碍/路径/轨迹）")
+    parser.add_argument("--card-navigation", action="store_true",
+                        help="识别策略卡并让 r0 前往最近的资源区或遗迹")
+    return parser.parse_args(argv)
+
+
 def parse_cli_command(line: str) -> dict | None:
     """把一行 CLI 输入解析成稳定命令结构；不执行任何硬件动作。"""
     parts = line.strip().split()
@@ -163,16 +179,7 @@ def viz_loop(fleet: Fleet, stop_event: threading.Event) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="rover_agent 主程序")
-    parser.add_argument("--params", default=None, help="params.yaml 路径")
-    parser.add_argument("--camera", type=int, default=0)
-    parser.add_argument("--config", default=None,
-                        help="游戏配置 json（读 map.zones 作障碍）")
-    parser.add_argument("--bridge", default=None,
-                        help="Runtime WebSocket 地址，如 ws://127.0.0.1:8000/ws")
-    parser.add_argument("--viz", action="store_true",
-                        help="开单窗口实景叠加（坐标/障碍/路径/轨迹）")
-    args = parser.parse_args()
+    args = parse_args()
 
     params = load_params(args.params)
     fleet = Fleet(camera=args.camera, params=params, config=args.config)
@@ -186,6 +193,9 @@ def main() -> None:
             rate_hz=params["bridge"]["rate_hz"],
             theta_unit=params["bridge"]["theta_unit"],
         )
+    if args.card_navigation:
+        from rover_agent.card_navigation import start_card_navigation_thread
+        start_card_navigation_thread(fleet, stop_event)
 
     def cli_loop() -> None:
         try:
