@@ -38,11 +38,16 @@ export default function MissionPanel({ state, config }) {
 
   // ========== 正常阶段 ==========
   function renderNormal() {
+    const totalRelicCards = factions.reduce((s, f) => s + (f.vars?.relic_cards || 0), 0)
+    const totalEnergyBlocks = factions.reduce((s, f) => s + (f.vars?.energy_blocks || 0), 0)
+
     const items = [
       { label: '燃料收集', code: 'FUEL', value: `${totalFuel} / ${fuelTarget}`, pct: Math.min(100, (totalFuel / fuelTarget) * 100), color: '#63C7C4' },
       { label: '方舟修复', code: 'REPAIR', value: `${repairPct}%`, pct: repairPct, color: '#7FB069' },
+      { label: '遗迹卡', code: 'RELIC', value: `${totalRelicCards} / 6`, pct: Math.min(100, (totalRelicCards / 6) * 100), color: '#B08FC7' },
+      { label: '能量块', code: 'ENERGY', value: `${totalEnergyBlocks} / 10`, pct: Math.min(100, (totalEnergyBlocks / 10) * 100), color: '#E9B44C' },
       { label: '幸存机器人', code: 'ROVERS', value: `${aliveUnits} / ${totalUnits}`, pct: (aliveUnits / totalUnits) * 100, color: '#E7E1D6' },
-      { label: '已升空', code: 'LAUNCH', value: `${launchedCount} / ${factions.length}`, pct: (launchedCount / factions.length) * 100, color: '#E9B44C' },
+      { label: '已升空', code: 'LAUNCH', value: `${launchedCount} / ${factions.length}`, pct: (launchedCount / factions.length) * 100, color: '#7FB069' },
     ]
 
     // 因果总结

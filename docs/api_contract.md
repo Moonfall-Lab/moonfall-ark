@@ -2,6 +2,9 @@
 
 Runtime 提供 HTTP API 和 WebSocket API。HTTP 用于调试、查看状态和简单输入；WebSocket 用于比赛时的实时连接。
 
+真实视觉导航小车的命令、位姿、到达事件和障碍地图接口见
+[`rover_backend_api.md`](rover_backend_api.md)。
+
 ## 基础地址
 
 后端本机：
@@ -138,7 +141,7 @@ curl http://127.0.0.1:8000/api/state
     "robot_id": "r1",
     "action": "collect",
     "target_zone": "resource_ne",
-    "speed": 0.5,
+    "speed": 10,
     "priority": 1.2,
     "avoid": ["dust_center"]
   }

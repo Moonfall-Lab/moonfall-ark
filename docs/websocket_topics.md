@@ -173,6 +173,9 @@ Runtime 事件输出示例：
 ## perception.pose
 
 小车、人形或物体位置上传。当前 MVP 主要用于小车。
+真实视觉导航小车的完整字段和兼容规则见
+[`rover_backend_api.md`](./rover_backend_api.md)。小车坐标单位为厘米，
+`theta` 默认使用弧度。
 
 输入：
 
@@ -182,10 +185,11 @@ Runtime 事件输出示例：
   "source": "robot_r1",
   "timestamp": 1720000000.0,
   "payload": {
+    "car_id": "r1",
     "robot_id": "r1",
-    "x": 3.2,
-    "y": 5.1,
-    "theta": 90,
+    "x": 32.0,
+    "y": 51.0,
+    "theta": 1.5708,
     "status": "moving"
   }
 }
@@ -208,19 +212,21 @@ Runtime 下发给小车。
   "timestamp": 1720000000.0,
   "payload": {
     "command_id": "uuid",
-    "robot_id": "r1",
+    "car_id": "r1",
     "action": "collect",
     "target_zone": "resource_ne",
     "x": null,
     "y": null,
-    "speed": 0.5,
+    "speed": 10,
     "priority": 1.2,
     "avoid": ["dust_center"]
   }
 }
 ```
 
-小车客户端只处理 `payload.robot_id` 等于自己的命令。
+新调用使用 `payload.car_id`；迁移期间兼容 `payload.robot_id`。速度必须是
+整数 `0..10`。真实小车的目标解析、停车和地图接口见
+[`rover_backend_api.md`](./rover_backend_api.md)。
 
 ## cmd.arm
 

@@ -7,35 +7,43 @@ export const MOCK_CONFIG = {
   mode: 'ffa',
   flow: { phases: ['draw', 'command', 'action', 'combat', 'moon', 'resolve'] },
   map: {
-    grid: [12, 12],
+    // 真实场地：80cm × 60cm，坐标系原点在左下角
+    field: { width_cm: 80, height_cm: 60 },
+    grid: [80, 60], // 1cm 一格（路径规划精度）
     zones: [
-      { id: 'ship_a', kind: 'base', name: '飞船 A', center: [1, 1] },
-      { id: 'ship_b', kind: 'base', name: '飞船 B', center: [11, 1] },
-      { id: 'ship_c', kind: 'base', name: '飞船 C', center: [1, 11] },
-      { id: 'ship_d', kind: 'base', name: '飞船 D', center: [11, 11] },
-      { id: 'resource_left', kind: 'resource', name: '西资源', center: [3, 6] },
-      { id: 'resource_right', kind: 'resource', name: '东资源', center: [9, 6] },
-      { id: 'central_hi', kind: 'resource', name: '中央高能', center: [6, 6] },
-      { id: 'relic_top', kind: 'relic', name: '上遗迹', center: [6, 2] },
-      { id: 'relic_bottom', kind: 'relic', name: '下遗迹', center: [6, 10] },
-      { id: 'dust_area', kind: 'hazard', name: '月尘', center: [4, 8], dynamic: true },
-      { id: 'meteor_area', kind: 'obstacle', name: '陨石', center: [8, 8], dynamic: true },
-      { id: 'jam_area', kind: 'trap', name: '干扰', center: [8, 4], dynamic: true },
+      // 5 个真实固定目标（来自 rover_fixed_landmarks.md）
+      { id: 'energy_w', kind: 'resource', name: '西能源站', center: [1.92, 5.26], radius: 0.58, type: 'energy_station' },
+      { id: 'ruins_ne', kind: 'relic', name: '东北遗迹', center: [6.15, 5.11], radius: 0.54, type: 'ruins' },
+      { id: 'central_hi', kind: 'resource', name: '中央高能站', center: [3.74, 2.99], radius: 0.58, type: 'high_energy_station' },
+      { id: 'ruins_sw', kind: 'relic', name: '西南遗迹', center: [1.27, 1.02], radius: 0.59, type: 'ruins' },
+      { id: 'energy_se', kind: 'resource', name: '东南能源站', center: [6.18, 1.39], radius: 0.54, type: 'energy_station' },
+      // 动态区域（不预先放置，由后端事件触发产生）
+      // { id: 'dust_area', kind: 'hazard', name: '月尘', center: [4.0, 3.0], dynamic: true },
+      // { id: 'meteor_area', kind: 'obstacle', name: '陨石', center: [5.0, 4.0], dynamic: true },
+      // { id: 'jam_area', kind: 'trap', name: '干扰', center: [3.0, 4.5], dynamic: true },
     ],
   },
   factions: [
     { id: 'pa', name: 'PIONEER A', players: ['p1'] },
     { id: 'pb', name: 'PIONEER B', players: ['p2'] },
-    { id: 'pc', name: 'PIONEER C', players: ['p3'] },
-    { id: 'pd', name: 'PIONEER D', players: ['p4'] },
   ],
   inputs: { cards: [] },
 }
 
 const tierOf = (r) => (r < 25 ? 'sleep' : r < 50 ? 'alert' : r < 80 ? 'anger' : 'endgame')
-const SHIP = { pa: [1, 1], pb: [11, 1], pc: [1, 11], pd: [11, 11] }
-const TARGETS = [[3, 6], [9, 6], [6, 6], [6, 2], [6, 10], [1, 1], [11, 1], [1, 11], [11, 11]]
-const FIDS = ['pa', 'pb', 'pc', 'pd']
+// 真实场地：80cm × 60cm，坐标单位 = cm / 10（3D 世界单位）
+// 原点在左下角，x 范围 0-8，y 范围 0-6
+const SHIP = { pa: [0.5, 0.5], pb: [7.5, 0.5] }
+const TARGETS = [
+  [1.92, 5.26], // energy_w
+  [6.15, 5.11], // ruins_ne
+  [3.74, 2.99], // central_hi
+  [1.27, 1.02], // ruins_sw
+  [6.18, 1.39], // energy_se
+  [0.5, 0.5],   // 回基地
+  [7.5, 0.5],   // 回基地
+]
+const FIDS = ['pa', 'pb']
 
 export function startMock({ onState, onEvent }) {
   let turn = 1
@@ -47,13 +55,15 @@ export function startMock({ onState, onEvent }) {
     players: MOCK_CONFIG.factions.find((f) => f.id === id).players,
     rank: null,
     vars: {
-      fuel: 0, ship_hp: 3, shield: 0, jammed: 0,
+      fuel: 0, ship_hp: 3, hp: 3, shield: 0, jammed: 0,
       declaring_launch: 0, launched: 0, crashed: 0,
       heart_rate: 78, stress: 0.1,
+      relic_cards: 0, // 遗迹卡
+      energy_blocks: 0, // 能量块
     },
   }))
 
-  const units = ['r1', 'r2', 'r3', 'r4'].map((id, i) => {
+  const units = ['r0', 'r1'].map((id, i) => {
     const faction = FIDS[i]
     const [x, y] = SHIP[faction]
     return { id, faction, kind: 'rover', pose: { x, y, theta: 0 }, status: 'idle', carrying: null, _tx: x, _ty: y }
@@ -83,7 +93,7 @@ export function startMock({ onState, onEvent }) {
 
   const tick = () => {
     turn += 1
-    const avgStress = factions.reduce((s, f) => s + f.vars.stress, 0) / 4
+    const avgStress = factions.reduce((s, f) => s + f.vars.stress, 0) / factions.length
     rage = Math.max(0, Math.min(100, rage + (avgStress - 0.4) * 16 + (Math.random() * 10 - 5)))
 
     factions.forEach((f) => {
@@ -91,6 +101,18 @@ export function startMock({ onState, onEvent }) {
       f.vars.stress = Math.max(0, Math.min(1, f.vars.stress + (Math.random() * 0.2 - 0.09)))
       f.vars.heart_rate = Math.round(78 + f.vars.stress * 70 + (Math.random() * 8 - 4))
       if (Math.random() < 0.22 && f.vars.fuel < 5) f.vars.fuel += 1
+      // 遗迹卡：偶尔获得
+      if (Math.random() < 0.1 && f.vars.relic_cards < 3) f.vars.relic_cards += 1
+      // 能量块：搬运资源时获得
+      if (Math.random() < 0.15 && f.vars.energy_blocks < 5) f.vars.energy_blocks += 1
+      // 血量：狂暴度高时偶尔受伤
+      if (rage > 50 && Math.random() < 0.08 && f.vars.hp > 0) {
+        f.vars.hp -= 1
+        if (f.vars.hp <= 0) {
+          f.vars.crashed = 1
+          onEvent({ event_type: 'ship_crashed', message: `${f.id.toUpperCase()} 因损伤过重坠毁`, faction: f.id })
+        }
+      }
       if (f.vars.fuel >= 5 && !f.vars.declaring_launch && !f.vars.launched) {
         f.vars.declaring_launch = 1
         onEvent({ event_type: 'launch_jam', message: `${f.id.toUpperCase()} 宣布点火，月球锁定干扰`, faction: f.id })

@@ -7,7 +7,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { FACTION_COLORS } from '../lib/factions'
 
-const GRID = 12 // 12x12 棋盘
+const GRID = 12 // 12x12 棋盘（保留用于兼容）
+
 const MODELS = {
   ship_a: 'ship1',
   ship_b: 'ship2',
@@ -35,8 +36,12 @@ const RAGE_ENV = {
   endgame: { fog: 0x220a0a, hemi: 0xcc6666, sun: 0xff9070, sunI: 3.0, red: 1.0 },
 }
 
-const gx2w = (gx) => gx - GRID / 2 // 网格坐标 -> 世界坐标
-const gy2w = (gy) => gy - GRID / 2
+// 真实场地：80cm × 60cm，坐标单位 = cm / 10（1 世界单位 = 10cm）
+// 坐标原点在左下角，中心偏移到世界原点
+const FIELD_W = 8 // 80cm / 10
+const FIELD_H = 6 // 60cm / 10
+const gx2w = (gx) => gx - FIELD_W / 2 // 场地坐标 -> 世界坐标
+const gy2w = (gy) => gy - FIELD_H / 2
 
 function glowSpriteTexture(inner = 'rgba(255,255,255,1)', outer = 'rgba(255,255,255,0)') {
   const c = document.createElement('canvas')
@@ -125,7 +130,7 @@ export default class MoonScene {
 
     this.camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 300)
     // 导播视角：约 60° 俯视，保证四角飞船和中央目标同时可见。
-    this.camera.position.set(7, 17, 7)
+    this.camera.position.set(9, 8, 9) // 适配 8×6 矩形场地
 
     this.renderer.domElement.style.touchAction = 'none' // 触屏/触控板双指捏合缩放交给 OrbitControls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
@@ -134,8 +139,8 @@ export default class MoonScene {
     this.controls.dampingFactor = 0.06
     this.controls.autoRotate = true
     this.controls.autoRotateSpeed = 0.5
-    this.controls.minDistance = 5
-    this.controls.maxDistance = 40
+    this.controls.minDistance = 4
+    this.controls.maxDistance = 25
     this.controls.maxPolarAngle = Math.PI * 0.47
     this.controls.addEventListener('start', () => (this.controls.autoRotate = false))
 
@@ -195,16 +200,19 @@ export default class MoonScene {
     tex.repeat.set(2.2, 2.2)
     tex.anisotropy = 8
 
-    // 带起伏的月面：棋盘区域保持平整，四周隆起随机丘陵
-    const size = 130
-    const seg = 160
+    // 带起伏的月面：场地区域保持平整，四周隆起随机丘陵
+    const size = 80
+    const seg = 120
     const geo = new THREE.PlaneGeometry(size, size, seg, seg)
     const pos = geo.attributes.position
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
       const y = pos.getY(i)
-      const d = Math.max(Math.abs(x), Math.abs(y))
-      const edge = THREE.MathUtils.smoothstep(d, GRID / 2 + 1.5, size / 2)
+      // 场地是矩形 8×6，用 max(|x|/(halfW), |y|/(halfH)) 判断是否在场地外
+      const halfW = FIELD_W / 2 + 1.5
+      const halfH = FIELD_H / 2 + 1.5
+      const d = Math.max(Math.abs(x) / halfW, Math.abs(y) / halfH)
+      const edge = THREE.MathUtils.smoothstep(d, 1, size / 2 / Math.max(halfW, halfH))
       const n =
         Math.sin(x * 0.35) * Math.cos(y * 0.28) * 1.6 +
         Math.sin(x * 0.9 + 3.1) * Math.cos(y * 0.7 + 1.7) * 0.7 +
@@ -217,18 +225,19 @@ export default class MoonScene {
     this.ground.rotation.x = -Math.PI / 2
     this.scene.add(this.ground)
 
-    // 四角切角的月面工程平台。挤出方向向下，上表面保持在 y=0。
-    const half = GRID / 2 + 0.22
-    const cut = 1.42
+    // 四角切角的月面工程平台（矩形 8×6，匹配真实场地 80×60cm）
+    const halfW = FIELD_W / 2 + 0.22
+    const halfH = FIELD_H / 2 + 0.22
+    const cut = 0.8
     const platformShape = new THREE.Shape()
-    platformShape.moveTo(-half + cut, -half)
-    platformShape.lineTo(half - cut, -half)
-    platformShape.lineTo(half, -half + cut)
-    platformShape.lineTo(half, half - cut)
-    platformShape.lineTo(half - cut, half)
-    platformShape.lineTo(-half + cut, half)
-    platformShape.lineTo(-half, half - cut)
-    platformShape.lineTo(-half, -half + cut)
+    platformShape.moveTo(-halfW + cut, -halfH)
+    platformShape.lineTo(halfW - cut, -halfH)
+    platformShape.lineTo(halfW, -halfH + cut)
+    platformShape.lineTo(halfW, halfH - cut)
+    platformShape.lineTo(halfW - cut, halfH)
+    platformShape.lineTo(-halfW + cut, halfH)
+    platformShape.lineTo(-halfW, halfH - cut)
+    platformShape.lineTo(-halfW, -halfH + cut)
     platformShape.closePath()
 
     const deck = new THREE.Mesh(
@@ -248,14 +257,20 @@ export default class MoonScene {
     this.scene.add(inset)
 
     // 定位线降级为工业板缝：小格极弱，每 3 格一条主结构线。
+    // 使用矩形场地的 halfW/halfH
     const minorPts = []
     const majorPts = []
-    for (let i = 0; i <= GRID; i++) {
-      const v = i - GRID / 2
-      const limit = Math.abs(v) > GRID / 2 - cut ? half - (Math.abs(v) - (half - cut)) : GRID / 2
+    const gridMax = Math.max(FIELD_W, FIELD_H)
+    const gridSteps = Math.ceil(gridMax)
+    for (let i = 0; i <= gridSteps; i++) {
+      const v = i - gridMax / 2
+      // X 方向线：限制在 halfH 范围内
+      const limitX = Math.abs(v) > halfH - cut ? halfH - (Math.abs(v) - (halfH - cut)) : halfH
+      // Z 方向线：限制在 halfW 范围内
+      const limitZ = Math.abs(v) > halfW - cut ? halfW - (Math.abs(v) - (halfW - cut)) : halfW
       const target = i % 3 === 0 ? majorPts : minorPts
-      target.push(-limit, 0, v, limit, 0, v)
-      target.push(v, 0, -limit, v, 0, limit)
+      target.push(-limitZ, 0, v, limitZ, 0, v)
+      target.push(v, 0, -limitX, v, 0, limitX)
     }
     const minorGeo = new THREE.BufferGeometry()
     minorGeo.setAttribute('position', new THREE.Float32BufferAttribute(minorPts, 3))
@@ -285,16 +300,16 @@ export default class MoonScene {
       { opacity: 0.5 }, { opacity: 0.3 }, { opacity: 0.55 },
     ]
     let lcIdx = 0
-    ;[-3.8, 0, 3.8].forEach((v) => {
+    ;[-2.5, 0, 2.5].forEach((v) => {
       ;[-1, 1].forEach((side) => {
         const cfg = lightConfigs[lcIdx % lightConfigs.length]
         lcIdx++
         const mat = cfg.dim ? dimMat : makeLightMat(cfg.opacity)
-        const horizontal = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.035, 0.07), mat)
-        horizontal.position.set(v, 0.055, side * (half - 0.08))
+        const horizontal = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.035, 0.07), mat)
+        horizontal.position.set(v, 0.055, side * (halfH - 0.08))
         edgeLights.add(horizontal)
-        const vertical = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.035, 1.25), mat.clone())
-        vertical.position.set(side * (half - 0.08), 0.055, v)
+        const vertical = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.035, 0.8), mat.clone())
+        vertical.position.set(side * (halfW - 0.08), 0.055, v)
         edgeLights.add(vertical)
       })
     })
@@ -325,8 +340,8 @@ export default class MoonScene {
     const dustPositions = []
     for (let i = 0; i < 4; i++) {
       const angle = (i / 4) * Math.PI * 2
-      const cx = Math.cos(angle) * (half + 0.8)
-      const cz = Math.sin(angle) * (half + 0.8)
+      const cx = Math.cos(angle) * (halfW + 0.8)
+      const cz = Math.sin(angle) * (halfH + 0.8)
       dustPositions.push({ x: cx, z: cz, rot: Math.random() * Math.PI, scale: 2.5 + Math.random() * 1.5 })
       dustPositions.push({ x: cx * 0.6, z: cz * 0.6, rot: Math.random() * Math.PI, scale: 1.8 + Math.random() * 1.2 })
     }
@@ -512,7 +527,7 @@ export default class MoonScene {
       group.position.set(wx, 0, wz)
       group.userData.zoneId = z.id
       let color = KIND_COLOR[z.kind] || 0x8899aa
-      let scale = 2.2
+      let scale = 1.0 // 真实物体缩放（1 世界单位 = 10cm）
 
       if (z.kind === 'base') {
         const idx = shipOrder.indexOf(z.id)
@@ -544,11 +559,13 @@ export default class MoonScene {
         l.position.y = 1.6
         group.add(l)
       } else if (z.kind === 'resource') {
-        const name = z.id === 'central_hi' ? MODELS.central : MODELS.resource
-        scale = z.id === 'central_hi' ? 2.6 : 2.3
+        // 高能站用 fuel_station 模型，普通能源站用 resource_station
+        const isHigh = z.type === 'high_energy_station' || z.id === 'central_hi'
+        const name = isHigh ? MODELS.central : MODELS.resource
+        scale = isHigh ? 1.2 : 1.0 // 真实物体半径 ~5.5cm → 缩放到合理 3D 尺寸
         group.add(this._spawn(name, scale))
       } else if (z.kind === 'relic') {
-        group.add(this._spawn(z.id === 'relic_top' ? MODELS.relic_top : MODELS.relic_bottom, 2.2))
+        group.add(this._spawn(MODELS.relic_top, 1.0))
       } else if (z.kind === 'hazard') {
         group.add(this._spawn(MODELS.hazard, 2.0))
       } else if (z.kind === 'obstacle') {
@@ -561,7 +578,7 @@ export default class MoonScene {
       // 功能区保留克制的嵌入式定位环；玩家区已使用泊位灯条。
       if (z.kind !== 'base') {
         const ring = new THREE.Mesh(
-          new THREE.RingGeometry(0.55, 0.68, 32),
+          new THREE.RingGeometry(0.55, 0.7, 32), // 真实半径 ~5.5cm
           new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })
         )
         ring.rotation.x = -Math.PI / 2
@@ -868,7 +885,7 @@ export default class MoonScene {
     group.add(scanLine)
 
     // 7. 来源虚线（从画外天空指向目标）：提示"谁在打"
-    const origin = new THREE.Vector3(GRID / 2 + 3, 4.5, -GRID / 2 - 3)
+    const origin = new THREE.Vector3(FIELD_W / 2 + 2, 3.5, -FIELD_H / 2 - 2)
     const points = [origin, new THREE.Vector3(0, 0.16, 0)]
     const lineGeo = new THREE.BufferGeometry().setFromPoints(points)
     const line = new THREE.Line(
