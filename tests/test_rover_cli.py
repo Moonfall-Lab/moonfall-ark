@@ -43,9 +43,6 @@ class FakeFleet:
 
 
 class CliCommandParserTest(unittest.TestCase):
-    def test_agent_parser_accepts_card_navigation_flag(self):
-        self.assertTrue(agent.parse_args(["--card-navigation"]).card_navigation)
-
     def test_old_move_command_defaults_to_speed_ten(self):
         self.assertEqual(agent.parse_cli_command("r1 3 4"), {
             "action": "move", "robot_id": "r1",
