@@ -332,3 +332,43 @@ Runtime 错误消息。
   }
 }
 ```
+
+## input.qr_skill
+
+Insta360 Link 2C 二维码客户端在识别到已登记卡牌时发送。Runtime 会再次核对卡牌名称和技能 ID，只广播识别事件，不执行技能，也不修改游戏状态。
+
+输入：
+
+```json
+{
+  "topic": "input.qr_skill",
+  "source": "insta360_link_2c",
+  "timestamp": 1720000000.0,
+  "payload": {
+    "qr_text": "瞬移偷窃",
+    "skill_id": "teleport_steal",
+    "skill_name": "瞬移偷窃"
+  }
+}
+```
+
+有效输入广播：
+
+```json
+{
+  "topic": "state.event",
+  "source": "runtime",
+  "timestamp": 1720000000.0,
+  "payload": {
+    "event_type": "qr_skill_detected",
+    "message": "识别到技能卡：瞬移偷窃",
+    "data": {
+      "qr_text": "瞬移偷窃",
+      "skill_id": "teleport_steal",
+      "skill_name": "瞬移偷窃"
+    }
+  }
+}
+```
+
+未知二维码、缺少字段或名称与技能 ID 不一致时返回 `INVALID_PAYLOAD`。

@@ -8,9 +8,11 @@ from pydantic import ValidationError
 
 from app.api.deps import get_voice_parser, get_world_state_manager, robot_command_from_intent
 from app.core.constants import (
+    CONFIG_PATH,
     RUNTIME_SOURCE,
     TOPIC_CMD_ROBOT,
     TOPIC_INPUT_CARD,
+    TOPIC_INPUT_QR_SKILL,
     TOPIC_INPUT_DECLARE_LAUNCH,
     TOPIC_INPUT_VOICE,
     TOPIC_SENSOR_HR,
@@ -19,6 +21,7 @@ from app.core.constants import (
 )
 from app.models.messages import RuntimeMessage, make_error, make_message
 from app.services.event_logger import log_ai, log_event
+from app.services.qr_skill_scanner import load_skill_allowlist
 
 
 router = APIRouter()
@@ -111,6 +114,9 @@ async def route_message(websocket: WebSocket, message: RuntimeMessage) -> None:
         if message.topic == TOPIC_INPUT_CARD:
             await _handle_input_card(message)
             return
+        if message.topic == TOPIC_INPUT_QR_SKILL:
+            await _handle_qr_skill(message)
+            return
         if message.topic == TOPIC_INPUT_DECLARE_LAUNCH:
             await _handle_declare_launch(message)
             return
@@ -182,6 +188,34 @@ async def _handle_input_card(message: RuntimeMessage) -> None:
     log_event(state_manager.get_state().session_id, TOPIC_STATE_EVENT, RUNTIME_SOURCE, event_payload)
     await manager.broadcast(make_message(TOPIC_STATE_EVENT, event_payload))
     await manager.broadcast(make_message(TOPIC_STATE_WORLD, state_manager.get_state_dict()))
+
+
+async def _handle_qr_skill(message: RuntimeMessage) -> None:
+    state_manager = get_world_state_manager()
+    payload = message.payload
+    qr_text = str(payload["qr_text"]).strip()
+    skill_id = str(payload["skill_id"]).strip()
+    skill_name = str(payload["skill_name"]).strip()
+    if not qr_text or not skill_id or not skill_name:
+        raise ValueError("qr_text, skill_id and skill_name must be non-empty")
+
+    skill = load_skill_allowlist(CONFIG_PATH).get(qr_text)
+    if skill is None:
+        raise ValueError(f"unknown QR skill: {qr_text}")
+    if skill.skill_id != skill_id or skill.skill_name != skill_name:
+        raise ValueError("QR skill payload does not match configured skill")
+
+    event_payload = {
+        "event_type": "qr_skill_detected",
+        "message": f"识别到技能卡：{skill.skill_name}",
+        "data": {
+            "qr_text": qr_text,
+            "skill_id": skill.skill_id,
+            "skill_name": skill.skill_name,
+        },
+    }
+    log_event(state_manager.get_state().session_id, TOPIC_STATE_EVENT, RUNTIME_SOURCE, event_payload)
+    await manager.broadcast(make_message(TOPIC_STATE_EVENT, event_payload))
 
 
 async def _handle_declare_launch(message: RuntimeMessage) -> None:
