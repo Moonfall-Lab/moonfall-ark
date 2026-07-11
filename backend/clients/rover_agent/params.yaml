@@ -22,8 +22,8 @@ robots:
   # car_id 与车顶 AprilTag id 固定一一对应：0→r0、1→r1、2→r2、3→r3。
   # theta_offset_deg：码没按"上边朝车头"贴时的方向补偿，
   # 在 viz 里看箭头与车头的夹角填写（车头偏箭头顺时针 90° 就填 -90）。
-  r0: { ip: "10.151.217.122", marker_id: 0, theta_offset_deg: 0 }
-  r1: { ip: "10.151.217.220", marker_id: 1, theta_offset_deg: 0 }
+  r0: { ip: "10.202.241.122", marker_id: 0, theta_offset_deg: 0 }
+  r1: { ip: "10.202.241.220", marker_id: 1, theta_offset_deg: 0 }
   # r2: { ip: "", marker_id: 2, theta_offset_deg: 0 }
   # r3: { ip: "", marker_id: 3, theta_offset_deg: 0 }
 
@@ -76,7 +76,7 @@ drive:
 planner:
   vehicle_length_cm: 6    # 车体实际长度
   vehicle_width_cm: 5.5   # 车体实际宽度
-  safety_clearance_cm: 0.5  # 车体侧边之外额外保留的避障距离
+  safety_clearance_cm: 1.0  # 车体侧边之外额外保留的避障距离
   inflate_cells: 1     # zone 类障碍的膨胀圈数（兼容游戏配置 zones 用）
   connectivity: 8
 

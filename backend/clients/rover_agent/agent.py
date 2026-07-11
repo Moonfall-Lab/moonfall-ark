@@ -21,6 +21,7 @@ from rover_agent.controller import validate_speed_level
 from rover_agent.fleet import Fleet, load_zones  # noqa: F401
 from rover_agent.overlay import draw_overlay
 from rover_agent.planner import planning_margin_cm
+from rover_agent.runtime_map import load_runtime_landmarks
 from rover_agent.viz import load_params
 
 
@@ -168,6 +169,10 @@ def main() -> None:
     parser.add_argument("--camera", type=int, default=0)
     parser.add_argument("--config", default=None,
                         help="游戏配置 json（读 map.zones 作障碍）")
+    parser.add_argument(
+        "--landmarks-config", default=None,
+        help="Runtime YAML 配置（读取 landmarks 作为固定目标和规划障碍）",
+    )
     parser.add_argument("--bridge", default=None,
                         help="Runtime WebSocket 地址，如 ws://127.0.0.1:8000/ws")
     parser.add_argument("--viz", action="store_true",
@@ -175,7 +180,14 @@ def main() -> None:
     args = parser.parse_args()
 
     params = load_params(args.params)
-    fleet = Fleet(camera=args.camera, params=params, config=args.config)
+    landmarks = (load_runtime_landmarks(args.landmarks_config)
+                 if args.landmarks_config else None)
+    fleet = Fleet(
+        camera=args.camera,
+        params=params,
+        config=args.config,
+        landmarks=landmarks,
+    )
     stop_event = threading.Event()
 
     if args.bridge:
