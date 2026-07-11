@@ -18,9 +18,14 @@ import asyncio
 import json
 import os
 import time
+from pathlib import Path
 
 import aiohttp
 import websockets
+from dotenv import load_dotenv
+
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 RPPG_URL      = os.getenv("RPPG_URL",    "http://192.168.20.29:5050")
 MOONFALL_WS   = os.getenv("MOONFALL_WS", "ws://127.0.0.1:8000/ws")
@@ -59,8 +64,9 @@ async def _drain(ws):
                 print(f"[bridge] event: {msg['payload']}")
             # state.world is noisy — only print moon_rage
             elif topic == "state.world":
-                rage = msg["payload"].get("moon_rage", "?")
-                print(f"[bridge] moon_rage={rage:.2f}")
+                rage = msg["payload"].get("global", {}).get("moon_rage")
+                if rage is not None:
+                    print(f"[bridge] moon_rage={float(rage):.2f}")
 
 
 async def main():
