@@ -137,8 +137,8 @@ class WorldStateManager:
             unit.status = str(status)
             return unit
 
-    def card_destination(self, player_id: str, skill_id: str) -> tuple[str, str] | None:
-        """Resolve a QR skill to an addressed rover and a configured landmark."""
+    def card_destination(self, player_id: str, skill_id: str) -> tuple[str, dict[str, Any]] | None:
+        """Resolve a QR skill to an addressed rover and a destination center."""
         card_id = self.config.get("qr_cards", {}).get(skill_id)
         rover_id = self.config.get("players", {}).get(player_id)
         if not card_id or not rover_id:
@@ -158,7 +158,7 @@ class WorldStateManager:
             (float(item["x_cm"]) - unit.pose.x) ** 2 + (float(item["y_cm"]) - unit.pose.y) ** 2,
             item["id"],
         ))
-        return rover_id, str(landmark["id"])
+        return rover_id, landmark
 
     def faction_for_player(self, player_id: str | None) -> FactionState | None:
         if player_id is None:

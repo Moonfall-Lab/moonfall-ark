@@ -242,11 +242,12 @@ async def _handle_qr_skill(message: RuntimeMessage) -> None:
     player_id = str(payload.get("player_id", "p1"))
     destination = get_world_state_manager().card_destination(player_id, skill.skill_id)
     if destination is not None:
-        car_id, landmark_id = destination
+        car_id, landmark = destination
         await manager.broadcast(make_message(TOPIC_CMD_ROBOT, {
             "command_id": str(uuid4()), "car_id": car_id,
             "robot_id": car_id, "action": "move_to",
-            "landmark_id": landmark_id, "speed": 5,
+            "x": float(landmark["x_cm"]), "y": float(landmark["y_cm"]),
+            "speed": 5,
         }))
     await manager.broadcast(make_message(TOPIC_STATE_EVENT, event_payload))
 

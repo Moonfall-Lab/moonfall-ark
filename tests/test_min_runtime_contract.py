@@ -55,7 +55,9 @@ class MinimalRuntimeContractTest(unittest.TestCase):
 
         self.assertEqual(command["topic"], "cmd.robot")
         self.assertEqual(command["payload"]["car_id"], "r0")
-        self.assertEqual(command["payload"]["landmark_id"], "obstacle-1")
+        self.assertEqual(command["payload"]["x"], 19.22)
+        self.assertEqual(command["payload"]["y"], 52.58)
+        self.assertIsNone(command["payload"].get("landmark_id"))
 
     def test_pose_message_updates_r0_in_centimeters(self):
         with TestClient(app) as client:
