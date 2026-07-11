@@ -23,7 +23,7 @@ robots:
   # theta_offset_deg：码没按"上边朝车头"贴时的方向补偿，
   # 在 viz 里看箭头与车头的夹角填写（车头偏箭头顺时针 90° 就填 -90）。
   r0: { ip: "10.202.241.122", marker_id: 0, theta_offset_deg: 0 }
-  r1: { ip: "10.202.241.220", marker_id: 1, theta_offset_deg: 0 }
+  r1: { ip: "10.202.241.221", marker_id: 1, theta_offset_deg: 0 }
   # r2: { ip: "", marker_id: 2, theta_offset_deg: 0 }
   # r3: { ip: "", marker_id: 3, theta_offset_deg: 0 }
 

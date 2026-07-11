@@ -94,7 +94,7 @@ class TimingSplitTest(unittest.TestCase):
     def test_field_config_registers_second_rover(self):
         params = load_params()
         self.assertEqual(params["robots"]["r1"], {
-            "ip": "10.202.241.220",
+            "ip": "10.202.241.221",
             "marker_id": 1,
             "theta_offset_deg": 0,
         })
