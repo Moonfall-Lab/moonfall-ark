@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { factionColor } from '../lib/factions'
+import HeartRateWave from './HeartRateWave'
 
 const PLAYER_ART = {
   pa: '/assets/ui/players/pa.png',
@@ -86,8 +87,8 @@ export default function PlayerBar({ faction, config, unit, stressPct = 0 }) {
 
       <div className="flex-1 px-2.5 py-1.5">
         {/* 第一行：代号 + 名称 + 心率 */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-baseline gap-1.5">
+        <div className="flex items-center gap-2">
+          <div className="flex flex-shrink-0 items-baseline gap-1.5">
             <span className="font-condensed text-sm font-bold leading-none" style={{ color }}>
               {faction.id.toUpperCase()}
             </span>
@@ -96,7 +97,10 @@ export default function PlayerBar({ faction, config, unit, stressPct = 0 }) {
               <span className="text-[8px] text-muted font-mono leading-none">#{faction.rank}</span>
             ) : null}
           </div>
-          <div className="flex items-baseline gap-1">
+          <div className="h-7 min-w-0 flex-1 overflow-hidden border-x border-white/[0.05] px-1">
+            <HeartRateWave bpm={hr} color={hrCol} compact />
+          </div>
+          <div className="flex flex-shrink-0 items-baseline gap-1">
             <span className="font-condensed text-lg font-bold tabular-nums leading-none" style={{ color: hrCol }}>
               {hr || '--'}
             </span>
