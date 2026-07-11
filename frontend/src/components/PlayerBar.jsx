@@ -118,8 +118,20 @@ export default function PlayerBar({ faction, config, unit, stressPct = 0 }) {
           )}
         </div>
 
-        {/* 第三行：ENERGY 燃料 + DAMAGE 船血（带标签） */}
+        {/* 第三行：HP 血量 + FUEL 燃料 */}
         <div className="flex items-center justify-between mt-1 gap-2">
+          <div className="flex items-center gap-1">
+            <span className="text-[6px] font-mono text-muted">HP</span>
+            <div className="flex gap-[2px]">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="w-1.5 h-2"
+                  style={{ background: i < (v.hp ?? 3) ? '#F0523D' : 'rgba(255,255,255,0.06)' }}
+                />
+              ))}
+            </div>
+          </div>
           <div className="flex items-center gap-1">
             <span className="text-[6px] font-mono text-muted">FUEL</span>
             <div className="flex gap-[2px]">
@@ -139,10 +151,26 @@ export default function PlayerBar({ faction, config, unit, stressPct = 0 }) {
                 <div
                   key={i}
                   className="w-1.5 h-2"
-                  style={{ background: i < shipHp ? '#F0523D' : 'rgba(255,255,255,0.06)' }}
+                  style={{ background: i < shipHp ? '#63C7C4' : 'rgba(255,255,255,0.06)' }}
                 />
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* 第四行：遗迹卡 + 能量块 */}
+        <div className="flex items-center justify-between mt-0.5 gap-2">
+          <div className="flex items-center gap-1">
+            <span className="text-[6px] font-mono text-muted">RELIC</span>
+            <span className="text-[8px] font-mono font-bold tabular-nums" style={{ color: '#7FB069' }}>
+              {v.relic_cards ?? 0}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[6px] font-mono text-muted">ENERGY</span>
+            <span className="text-[8px] font-mono font-bold tabular-nums" style={{ color: '#E9B44C' }}>
+              {v.energy_blocks ?? 0}
+            </span>
           </div>
         </div>
 

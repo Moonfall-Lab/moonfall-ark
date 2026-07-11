@@ -33,7 +33,7 @@ export const MOCK_CONFIG = {
 const tierOf = (r) => (r < 25 ? 'sleep' : r < 50 ? 'alert' : r < 80 ? 'anger' : 'endgame')
 // 真实场地：80cm × 60cm，坐标单位 = cm / 10（3D 世界单位）
 // 原点在左下角，x 范围 0-8，y 范围 0-6
-const SHIP = { pa: [0.5, 0.5], pb: [7.5, 0.5] } // 两辆车初始在左下、右下角
+const SHIP = { pa: [0.5, 0.5], pb: [7.5, 0.5] }
 const TARGETS = [
   [1.92, 5.26], // energy_w
   [6.15, 5.11], // ruins_ne
@@ -55,9 +55,11 @@ export function startMock({ onState, onEvent }) {
     players: MOCK_CONFIG.factions.find((f) => f.id === id).players,
     rank: null,
     vars: {
-      fuel: 0, ship_hp: 3, shield: 0, jammed: 0,
+      fuel: 0, ship_hp: 3, hp: 3, shield: 0, jammed: 0,
       declaring_launch: 0, launched: 0, crashed: 0,
       heart_rate: 78, stress: 0.1,
+      relic_cards: 0, // 遗迹卡
+      energy_blocks: 0, // 能量块
     },
   }))
 
@@ -99,6 +101,18 @@ export function startMock({ onState, onEvent }) {
       f.vars.stress = Math.max(0, Math.min(1, f.vars.stress + (Math.random() * 0.2 - 0.09)))
       f.vars.heart_rate = Math.round(78 + f.vars.stress * 70 + (Math.random() * 8 - 4))
       if (Math.random() < 0.22 && f.vars.fuel < 5) f.vars.fuel += 1
+      // 遗迹卡：偶尔获得
+      if (Math.random() < 0.1 && f.vars.relic_cards < 3) f.vars.relic_cards += 1
+      // 能量块：搬运资源时获得
+      if (Math.random() < 0.15 && f.vars.energy_blocks < 5) f.vars.energy_blocks += 1
+      // 血量：狂暴度高时偶尔受伤
+      if (rage > 50 && Math.random() < 0.08 && f.vars.hp > 0) {
+        f.vars.hp -= 1
+        if (f.vars.hp <= 0) {
+          f.vars.crashed = 1
+          onEvent({ event_type: 'ship_crashed', message: `${f.id.toUpperCase()} 因损伤过重坠毁`, faction: f.id })
+        }
+      }
       if (f.vars.fuel >= 5 && !f.vars.declaring_launch && !f.vars.launched) {
         f.vars.declaring_launch = 1
         onEvent({ event_type: 'launch_jam', message: `${f.id.toUpperCase()} 宣布点火，月球锁定干扰`, faction: f.id })
