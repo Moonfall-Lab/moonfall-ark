@@ -27,10 +27,35 @@ class MinimalRuntimeContractTest(unittest.TestCase):
                     },
                 })
                 event = websocket.receive_json()
+                if event["topic"] == "cmd.robot":
+                    event = websocket.receive_json()
 
         self.assertEqual(event["topic"], "state.event")
         self.assertEqual(event["payload"]["event_type"], "qr_skill_detected")
         self.assertEqual(event["payload"]["data"]["skill_id"], "collect_priority")
+
+    def test_collect_qr_commands_players_rover_to_nearest_energy_station(self):
+        with TestClient(app) as client:
+            with client.websocket_connect("/ws") as websocket:
+                websocket.receive_json()
+                websocket.send_json({
+                    "topic": "perception.pose", "source": "rover_agent",
+                    "timestamp": 1.0,
+                    "payload": {"car_id": "r0", "x": 20, "y": 50, "theta": 0, "status": "idle"},
+                })
+                websocket.send_json({
+                    "topic": "input.qr_skill", "source": "insta360_link_2c",
+                    "timestamp": 2.0,
+                    "payload": {
+                        "player_id": "p1", "qr_text": "采集优先",
+                        "skill_id": "collect_priority", "skill_name": "采集优先",
+                    },
+                })
+                command = websocket.receive_json()
+
+        self.assertEqual(command["topic"], "cmd.robot")
+        self.assertEqual(command["payload"]["car_id"], "r0")
+        self.assertEqual(command["payload"]["landmark_id"], "obstacle-1")
 
     def test_pose_message_updates_r0_in_centimeters(self):
         with TestClient(app) as client:

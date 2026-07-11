@@ -2,6 +2,19 @@ game_id: moonfall_mvp
 schema_version: "1.0"
 mode: ffa
 
+# 最简 Runtime 的玩家、地标与 QR 卡牌语义；坐标单位均为厘米。
+players: { p1: r0, p2: r1, p3: r2, p4: r3 }
+landmarks:
+  - { id: obstacle-1, x_cm: 19.22, y_cm: 52.58, radius_cm: 5.82, type: energy_station }
+  - { id: obstacle-2, x_cm: 61.51, y_cm: 51.09, radius_cm: 5.44, type: ruins }
+  - { id: obstacle-3, x_cm: 37.37, y_cm: 29.88, radius_cm: 5.77, type: high_energy_station }
+  - { id: obstacle-4, x_cm: 12.71, y_cm: 10.16, radius_cm: 5.94, type: ruins }
+  - { id: obstacle-5, x_cm: 61.83, y_cm: 13.90, radius_cm: 5.41, type: energy_station }
+qr_cards:
+  collect_priority: collect
+  explore_relic: explore_ruin
+  return_settle: return_home
+
 flow:
   # MVP 六阶段回合：摸牌 → 指挥 → 行动 → 对抗 → 月球 → 结算
   phases:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
@@ -238,6 +239,15 @@ async def _handle_qr_skill(message: RuntimeMessage) -> None:
         "message": f"识别到技能卡：{skill.skill_name}",
         "data": {"skill_id": skill.skill_id, "skill_name": skill.skill_name},
     }
+    player_id = str(payload.get("player_id", "p1"))
+    destination = get_world_state_manager().card_destination(player_id, skill.skill_id)
+    if destination is not None:
+        car_id, landmark_id = destination
+        await manager.broadcast(make_message(TOPIC_CMD_ROBOT, {
+            "command_id": str(uuid4()), "car_id": car_id,
+            "robot_id": car_id, "action": "move_to",
+            "landmark_id": landmark_id, "speed": 5,
+        }))
     await manager.broadcast(make_message(TOPIC_STATE_EVENT, event_payload))
 
 
