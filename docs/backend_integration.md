@@ -1,5 +1,46 @@
 # Moonfall Runtime Backend Integration
 
+## Insta360 Link 2C 二维码技能识别
+
+该客户端使用 Link 2C 的物理 UVC 视频流识别卡牌二维码，只上报技能名称和技能 ID，不识别玩家、不选择目标，也不执行技能效果。
+
+安装后端依赖：
+
+```powershell
+cd backend
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+先用现有卡牌图片验证解码器与配置映射：
+
+```powershell
+backend\.venv\Scripts\python.exe backend\clients\insta360_qr_client.py `
+  --validate-images "C:\Users\x\Desktop\git\卡牌"
+```
+
+预期输出 10 条“文件名 / 中文卡名 / skill_id”，最后显示 `validated 10/10 card images`。
+
+启动 Runtime 后，以无预览模式运行摄像头客户端：
+
+```powershell
+backend\.venv\Scripts\python.exe backend\clients\insta360_qr_client.py `
+  --camera-index 0 `
+  --ws-url ws://127.0.0.1:8000/ws
+```
+
+布置和调试时可打开预览：
+
+```powershell
+backend\.venv\Scripts\python.exe backend\clients\insta360_qr_client.py `
+  --camera-index 0 `
+  --preview
+```
+
+请选择设备列表中的物理 `Insta360 Link 2C`，不要选择 `Insta360 Virtual Camera`。如果索引 0 不是 Link 2C，依次尝试 `--camera-index 1`、`2`。默认采集参数为 1920×1080、30 FPS；按 `Q`、`Esc` 或 `Ctrl+C` 退出。
+
+同一张卡持续停留在画面中只上报一次。二维码连续 5 个处理帧未出现后，该卡重新进入可触发状态；可用 `--missing-frame-threshold` 调整。Runtime 接收 `input.qr_skill` 后仅广播 `qr_skill_detected`，不会调用卡牌效果。
+
 This branch implements the MVP IR contract from `前后端对接文档 · Moonfall Runtime (MVP IR).md`.
 
 ## Base URLs
