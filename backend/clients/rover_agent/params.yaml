@@ -1,0 +1,70 @@
+# rover_agent 现场参数（唯一调参入口，含义见 plan §0.5 与 README）
+
+# ── 场地：四角标记中心围成的矩形 ──
+table:
+  width_cm: 80       # 横向 x 轴
+  height_cm: 60      # 纵向 y 轴
+  cell_cm: 1         # 规划栅格一格 1cm
+
+# ── 四角定位标记（现场已有的 AprilTag，2026-07-10 探测确认）──
+corners:
+  dict: DICT_APRILTAG_36h11
+  marker_ids: [4, 5, 6, 7]
+  auto_assign: true  # 按画面几何自动分配四角（画面左下=原点，逆时针），启动时打印分配结果
+
+# ── 车顶标记 ──
+# 与四角同一套字典 → 每帧只扫一次，检测耗时减半（位姿丢失的主要来源之一）。
+# 注意：场上不能有第二张同 id 的码（比如打印剩下的纸片），会被认成车。
+cars:
+  dict: DICT_APRILTAG_36h11
+
+robots:
+  # car_id 与车顶 AprilTag id 固定一一对应：0→r0、1→r1、2→r2、3→r3。
+  # theta_offset_deg：码没按"上边朝车头"贴时的方向补偿，
+  # 在 viz 里看箭头与车头的夹角填写（车头偏箭头顺时针 90° 就填 -90）。
+  r0: { ip: "10.202.241.122", marker_id: 0, theta_offset_deg: 0 }
+  r1: { ip: "10.202.241.220", marker_id: 1, theta_offset_deg: 0 }
+  # r2: { ip: "", marker_id: 2, theta_offset_deg: 0 }
+  # r3: { ip: "", marker_id: 3, theta_offset_deg: 0 }
+
+# ── 固定目标（厘米；既参与绕行，也可作为车辆目的地）──
+# 开场用 setup_field 手动画入；临时绕行障碍只存在内存，不写入本文件。
+landmarks: []
+
+vision:
+  rate_hz: 15        # 检测频率上限
+  ema_alpha: 0.5     # 位姿滑动平均系数，1 = 不平滑
+  stale_sec: 0.5     # 位姿超过此时长未更新视为丢失 → 刹车
+  command_pose_wait_sec: 2  # 发令瞬间丢码时最多等待 2s，恢复后再规划
+
+control:
+  correction_period_ms: 500  # 每 500ms 用最新视觉位姿修正一次轮速
+  min_cruise_pct: 25   # speed=1 的直行轮速；过低可能无法克服静摩擦
+  max_cruise_pct: 60   # speed=10 的直行轮速（原来的巡航速度）
+  min_turn_pct: 25     # speed=1 的原地转轮速
+  max_turn_pct: 40     # speed=10 的原地转轮速（原来的转向速度）
+  k_heading: 40        # 直行时航向比例修正增益（pct/rad）
+  wheel_step_pct: 5    # 轮速量化档位：修正量按 5% 一档取整，视觉噪声不再引起指令抖动
+  turn_enter_rad: 0.9    # ≈52°，误差大于此值才原地转；以下直行画弧修正
+  turn_exit_rad: 0.25    # ≈14°，原地转降到此值以下才退出（滞回，防指令延迟导致的来回打转）
+  waypoint_tol_cm: 3  # 中间路径点到达判定
+  arrive_tol_cm: 2    # 支持最短 5cm 移动；进入后停车并锁定 arrived
+  landmark_preapproach_gap_cm: 4  # 先停在固定目标外 4cm，再低速贴近
+  landmark_gap_min_cm: 1          # 最终车体与目标的允许最小间隙
+  landmark_gap_max_cm: 2          # 最终车体与目标的允许最大间隙
+  landmark_confirm_frames: 2      # 连续两拍满足间隙才确认到达
+  landmark_creep_speed: 1         # 最终贴近阶段固定最低速度
+  landmark_approach_samples: 24   # 沿目标外沿采样接近方向
+
+drive:
+  keepalive_period_ms: 250 # 现场实测：80ms 会拥塞弱链路；250ms 稳定且仍小于 1000ms 看门狗
+  command_ttl_ms: 1000     # 控制线程 1s 未刷新轮速时，保活线程改发 0,0
+
+planner:
+  robot_radius_cm: 2   # 障碍外扩 2cm；现场测试若擦碰需调大
+  inflate_cells: 1     # zone 类障碍的膨胀圈数（兼容游戏配置 zones 用）
+  connectivity: 8
+
+bridge:
+  rate_hz: 10          # perception.pose 上行频率
+  theta_unit: rad      # rad | deg —— 与引擎确认后定稿

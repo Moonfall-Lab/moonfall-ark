@@ -1,0 +1,4 @@
+numpy
+opencv-python>=4.7      # 服务器/CI 无显示环境可换 opencv-python-headless
+PyYAML
+websockets              # 仅 --bridge 接 Runtime 时需要

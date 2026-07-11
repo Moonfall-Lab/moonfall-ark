@@ -10,7 +10,7 @@ class RobotCommand(BaseModel):
     target_zone: str | None = None
     x: float | None = None
     y: float | None = None
-    speed: float = 0.5
+    speed: int = Field(default=10, ge=0, le=10, strict=True)
     priority: float = 1.0
     avoid: list[str] = Field(default_factory=list)
 

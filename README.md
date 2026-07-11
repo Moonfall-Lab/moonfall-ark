@@ -190,9 +190,13 @@ python clients\hr_client_example.py
 
 更细的接入步骤见 `docs/teammate_quickstart.md`。
 
+真实视觉导航小车代码位于 `backend/clients/rover_agent/`。通用后端接入时，
+直接遵循 [`docs/rover_backend_api.md`](docs/rover_backend_api.md) 的 WebSocket
+消息契约；坐标统一使用厘米，速度统一使用整数 `0..10`。
+
 ## 目前 TODO
 
-- `robot_client_example.py` 里需要队友接真实小车控制代码。
+- `robot_client_example.py` 保留为最小消息示例；真实视觉导航实现见 `rover_agent`。
 - `arm_client_example.py` 里需要队友接真实机械臂 SDK 或控制协议。
 - 语音 LLM 默认没有 API Key 时走规则兜底；接入 DeepSeek/NVIDIA 后可增强自然语言理解。
 - 第一版没有 Redis、Celery、PostgreSQL、Docker Compose，也没有复杂 Agent 框架。
