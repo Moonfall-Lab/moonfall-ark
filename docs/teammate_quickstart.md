@@ -239,7 +239,9 @@ python clients\arm_client_example.py
 
 ## 5. 心率同学怎么连
 
-运行假心率：
+### 方式一：模拟心率（调试用）
+
+运行假心率客户端，每秒发送随机心率（80-125 bpm）：
 
 ```bat
 cd backend
@@ -248,6 +250,52 @@ set MOONFALL_WS_URL=ws://192.168.1.23:8000/ws
 set PLAYER_ID=p1
 python clients\hr_client_example.py
 ```
+
+### 方式二：真实 rPPG 心率（DGX 接入）
+
+如果 DGX 上已运行 rPPG Server（端口 5050），使用 `rppg_bridge.py` 桥接真实心率：
+
+```bat
+cd backend
+set RPPG_URL=http://192.168.20.29:5050
+set MOONFALL_WS=ws://127.0.0.1:8001/ws
+set POLL_INTERVAL=1.0
+python rppg_bridge.py
+```
+
+> 如果用 Anaconda `yolov8` 环境而非 `.venv`：
+>
+> ```bat
+> set RPPG_URL=http://192.168.20.29:5050
+> set MOONFALL_WS=ws://127.0.0.1:8001/ws
+> C:\Users\<用户名>\.conda\envs\yolov8\python.exe rppg_bridge.py
+> ```
+
+`rppg_bridge.py` 会每秒轮询 rPPG Server 的 `/stats` 接口，将 4 位玩家的心率自动映射后推送到后端：
+
+| rPPG player | Moonfall player | Faction |
+|---|---|---|
+| player_1 | p1 | pa (A) |
+| player_2 | p2 | pb (B) |
+| player_3 | p3 | pc (C) |
+| player_4 | p4 | pd (D) |
+
+启动后终端会持续打印：
+
+```text
+[bridge] rPPG  → http://192.168.20.29:5050/stats
+[bridge] push  → ws://127.0.0.1:8001/ws
+[bridge] connected to moonfall
+[bridge] player_1 → p1 hr=76 bpm
+[bridge] player_2 → p2 hr=93 bpm
+[bridge] moon_rage=0.12
+```
+
+> **注意**：`MOONFALL_WS` 的端口必须与后端实际监听端口一致。后端跑在 8001 就写 8001。
+>
+> **进程稳定性**：如果前端心率数字停止更新，先检查后端 `/api/state` 里的 `heart_rate` 是否变化。如果后端也不变，说明 `rppg_bridge.py` 进程已退出，需要重新启动。详见 `docs/rppg_integration.md`。
+
+### 数据格式
 
 真实心率设备每秒发送：
 
@@ -270,7 +318,17 @@ stress = max(0.0, min(1.0, (heart_rate - baseline_hr) / 40.0))
 moon_rage = average(all_player_stress)
 ```
 
-然后广播 `state.world`。
+然后广播 `state.world`。前端底部 4 个玩家状态条会实时显示心率 BPM 和波形动画。
+
+### rPPG 视频画面
+
+rPPG Server 提供 MJPEG 实时视频流，可在浏览器中直接打开查看摄像头画面和人脸检测框：
+
+```text
+http://192.168.20.29:5050/video_feed
+```
+
+或打开 rPPG 控制台 `http://192.168.20.29:5050` 进行摄像头开启、玩家注册等操作。
 
 ## 6. 语音同学怎么连
 
