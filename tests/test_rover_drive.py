@@ -67,6 +67,17 @@ class DriveTest(unittest.TestCase):
         self.assertIn("0,0", msgs)
         drive.close()
 
+    def test_timed_pulse_stops_without_waiting_for_control_loop(self):
+        drive = RoverDrive("127.0.0.1", self.port, period_ms=200)
+        self._drain(0.05)
+        drive.start_pulse(-40, 40, duration_sec=0.05)
+        time.sleep(0.09)
+        msgs = self._drain(0.3)
+        self.assertIn("-40,40", msgs)
+        self.assertIn("0,0", msgs)
+        self.assertEqual(msgs[-1], "0,0")
+        drive.close()
+
 
 if __name__ == "__main__":
     unittest.main()

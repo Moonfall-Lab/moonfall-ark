@@ -31,7 +31,7 @@ def test_params():
         "vision": {"rate_hz": 15, "ema_alpha": 1.0, "stale_sec": 0.5},
         "drive": {"keepalive_period_ms": 250, "command_ttl_ms": 1000},
         "control": {
-            "correction_period_ms": 500,
+            "correction_period_ms": 100,
             "min_cruise_pct": 25, "max_cruise_pct": 60,
             "min_turn_pct": 25, "max_turn_pct": 40,
             "k_heading": 40, "turn_enter_rad": 0.9, "turn_exit_rad": 0.25,

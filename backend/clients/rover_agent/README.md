@@ -74,17 +74,20 @@ with Fleet(camera=0) as fleet:        # 拉起视觉 + 控制线程
 | `robots.<id>.ip / marker_id` | 车的 IP 与车顶标记号 | 现场必填 |
 | `table.width_cm / height_cm / cell_cm` | `80 / 60 / 1` 厘米地图 | 棋盘尺寸变化时修改 |
 | `landmarks` | 开场手动画入的固定目标 | 由 `setup_field` 写入并长期保存 |
-| `planner.robot_radius_cm` | 障碍规划外扩距离，当前 2cm | 车蹭到圆柱 → 调大 |
+| `planner.vehicle_length_cm / vehicle_width_cm` | 真实车体尺寸，当前 `6 × 5.5cm` | 路径横向外扩使用半车宽；车长参与贴近距离计算 |
+| `planner.safety_clearance_cm` | 车体侧边之外的额外避障距离，当前 0.5cm | 擦碰 → 调大；通道被封死 → 谨慎调小 |
 | `vision.ema_alpha` | 位姿平滑，1=不平滑 | 坐标抖 → 调小（如 0.3） |
 | `vision.stale_sec` | 位姿过期即刹车 | 检测帧率低 → 适当放大 |
 | `vision.command_pose_wait_sec` | 发令瞬间丢码时等待恢复，默认 2 秒 | 现场识别闪烁时保留默认值 |
-| `control.correction_period_ms` | 用最新位姿重算轮速的周期 | 默认 500ms；调小更灵敏，调大更平滑 |
+| `control.correction_period_ms` | 用最新位姿重算轮速的周期 | 默认 100ms；普通 UDP 输出仍由驱动层按 250ms 限频 |
 | `drive.keepalive_period_ms` | 重发最近轮速的周期 | 默认 250ms；现场实测 80ms 会拥塞弱链路 |
 | `drive.command_ttl_ms` | 控制线程不再刷新后，旧轮速还能保持多久 | 默认 1000ms；到期后保活线程改发停车 |
 | `control.min/max_cruise_pct` | speed 1/10 的直行轮速 | 低速不动 → 提高 min；整体过快 → 降 max |
-| `control.min/max_turn_pct` | speed 1/10 的原地转轮速 | 低速转不动或转向过猛时调整 |
+| `motion_models.default` | 现场实测直行速度与左右转向角速度 | 换车或轮胎/电池状态明显变化时重标定；可用 `r0/r1` 段单车覆盖 |
+| `control.min/max_turn_pct` | 未配置运动标定时的连续原地转轮速 | 正常现场配置已由 40% 标定脉冲取代 |
 | `control.k_heading` | 直行航向修正增益 | 走S形 → 调小；跑偏收敛慢 → 调大 |
-| `control.turn_enter_rad / turn_exit_rad` | 进入/退出原地转的两个阈值 | 频繁反转 → 拉大两阈值间距 |
+| `control.turn_enter_rad / turn_exit_rad` | 进入标定脉冲转向/恢复前进的阈值 | 默认约 30°/10° |
+| `control.turn_pulse_*` | 每次转多少、脉冲上下限、停车观察时间 | 默认消除预计误差 70%，避免过转 |
 | `control.arrive_tol_cm` | 终点允许误差，默认 2cm | 支持最短 5cm 移动 |
 | `control.landmark_gap_min/max_cm` | 到固定目标的最终车体间隙，默认 1–2cm | 贴得过近或不够近时调整 |
 | `planner.inflate_cells` | zone 类障碍（游戏配置）的膨胀圈数 | 蹭 zone 障碍 → 加 1 |
@@ -100,13 +103,15 @@ with Fleet(camera=0) as fleet:        # 拉起视觉 + 控制线程
 | 坐标跳变/漂移 | 角标记被局部遮挡；相机被碰过 → 按 `c` 重标定 |
 | θ 差 90°/180° | 车顶标记贴的方向不对（上边缘要朝车头） |
 | x 或 y 方向反了 | 四角标记 id 顺序贴错（0 必须在左下，逆时针 0→1→2→3） |
+| 原地左右反复转 | 核对 40% 功率左右角速度标定；查看日志中的转向脉冲时长 |
 | 到点后来回蹭 | 短距离命令使用 speed 1–3；核对 `arrive_tol_cm=2` |
-| 车蹭到圆柱障碍 | 核对实景红圈；或调大 `robot_radius_cm` |
+| 车蹭到圆柱障碍 | 核对车体尺寸和实景橙圈；或调大 `safety_clearance_cm` |
 | 明明有路却报不可达 | 膨胀后通道被封死 → 减小安全半径或挪开障碍 |
 
 `calibrate_straight` 只启动指定车辆，不会连接其他未开机车辆。每次按回车
 前把车放回无遮挡直线路段，车头前方至少留 25cm；脚本使用 150ms UDP
-保活以适配当前 300ms 固件看门狗。测试结束后，把终端最后两行 median
+保活用于提高标定脉冲的时间精度；正常运行仍使用 250ms 保活和 1000ms
+固件看门狗。测试结束后，把终端最后两行 median
 结果发给控制器调参人员即可。
 
 `calibrate_turn` 同样只启动指定车辆。每次按回车前把车放在地图中间，

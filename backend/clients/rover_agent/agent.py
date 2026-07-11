@@ -20,6 +20,7 @@ import threading
 from rover_agent.controller import validate_speed_level
 from rover_agent.fleet import Fleet, load_zones  # noqa: F401
 from rover_agent.overlay import draw_overlay
+from rover_agent.planner import planning_margin_cm
 from rover_agent.viz import load_params
 
 
@@ -152,7 +153,7 @@ def viz_loop(fleet: Fleet, stop_event: threading.Event) -> None:
                 frame, field.calibrator, fleet.get_obstacles(),
                 robot_states=fleet.rovers, paths=fleet.paths,
                 trails=fleet.trails,
-                robot_radius_cm=fleet.params["planner"]["robot_radius_cm"])
+                robot_radius_cm=planning_margin_cm(fleet.params))
             height = int(frame.shape[0] * cam_w / frame.shape[1])
             view = cv2.resize(frame, (cam_w, height))
         cv2.imshow("camera", view)

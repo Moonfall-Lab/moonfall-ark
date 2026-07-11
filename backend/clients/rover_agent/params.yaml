@@ -27,6 +27,14 @@ robots:
   # r2: { ip: "", marker_id: 2, theta_offset_deg: 0 }
   # r3: { ip: "", marker_id: 3, theta_offset_deg: 0 }
 
+# ── 现场运动标定（可在具体 r0/r1 段覆写同名字段）──
+motion_models:
+  default:
+    straight_speed_cm_s: { 5: 5.48, 10: 8.91 }
+    turn_power_pct: 40
+    left_turn_deg_s: 130.1
+    right_turn_deg_s: 99.9
+
 # ── 固定目标（厘米；既参与绕行，也可作为车辆目的地）──
 # 开场用 setup_field 手动画入；临时绕行障碍只存在内存，不写入本文件。
 landmarks: []
@@ -38,15 +46,20 @@ vision:
   command_pose_wait_sec: 2  # 发令瞬间丢码时最多等待 2s，恢复后再规划
 
 control:
-  correction_period_ms: 500  # 每 500ms 用最新视觉位姿修正一次轮速
+  correction_period_ms: 100  # 每 100ms 重算；drive 仍以 250ms 限频/保活
   min_cruise_pct: 25   # speed=1 的直行轮速；过低可能无法克服静摩擦
   max_cruise_pct: 60   # speed=10 的直行轮速（原来的巡航速度）
   min_turn_pct: 25     # speed=1 的原地转轮速
   max_turn_pct: 40     # speed=10 的原地转轮速（原来的转向速度）
   k_heading: 40        # 直行时航向比例修正增益（pct/rad）
   wheel_step_pct: 5    # 轮速量化档位：修正量按 5% 一档取整，视觉噪声不再引起指令抖动
-  turn_enter_rad: 0.9    # ≈52°，误差大于此值才原地转；以下直行画弧修正
-  turn_exit_rad: 0.25    # ≈14°，原地转降到此值以下才退出（滞回，防指令延迟导致的来回打转）
+  turn_enter_rad: 0.52   # ≈30°，超过后进入标定脉冲转向
+  turn_exit_rad: 0.17    # ≈10°，低于后退出转向、开始直行画弧
+  turn_pulse_fraction: 0.7  # 每次只消除预计误差的 70%，宁欠勿过
+  turn_pulse_min_sec: 0.08  # 太短可能克服不了静摩擦
+  turn_pulse_max_sec: 0.35  # 限制一次盲转角度
+  turn_settle_sec: 0.2      # 脉冲停车后等待机械惯性消散
+  turn_confirm_frames: 2    # 收到两帧新位姿后才决定下一次动作
   waypoint_tol_cm: 3  # 中间路径点到达判定
   arrive_tol_cm: 2    # 支持最短 5cm 移动；进入后停车并锁定 arrived
   landmark_preapproach_gap_cm: 4  # 先停在固定目标外 4cm，再低速贴近
@@ -61,7 +74,9 @@ drive:
   command_ttl_ms: 1000     # 控制线程 1s 未刷新轮速时，保活线程改发 0,0
 
 planner:
-  robot_radius_cm: 2   # 障碍外扩 2cm；现场测试若擦碰需调大
+  vehicle_length_cm: 6    # 车体实际长度
+  vehicle_width_cm: 5.5   # 车体实际宽度
+  safety_clearance_cm: 0.5  # 车体侧边之外额外保留的避障距离
   inflate_cells: 1     # zone 类障碍的膨胀圈数（兼容游戏配置 zones 用）
   connectivity: 8
 

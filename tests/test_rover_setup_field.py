@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from tests.rover_helpers import CLIENTS  # noqa: F401
@@ -56,6 +57,20 @@ class ObstacleInputTest(unittest.TestCase):
             setup_field.obstacle_summary(obstacle),
             "rock-1: (40.0,30.0)cm r=5.0cm",
         )
+
+    def test_landmarks_json_outputs_coordinates_and_extensible_properties(self):
+        exported = json.loads(setup_field.landmarks_json([
+            dict(parse_obstacle_input("rock-1 40.123 30.456 5.789"),
+                 properties={"type": "resource", "score": 3}),
+            parse_obstacle_input("rock-2 20 15 2.5"),
+        ]))
+        self.assertEqual(exported, [
+            {"id": "rock-1", "shape": "circle", "x_cm": 40.12,
+             "y_cm": 30.46, "radius_cm": 5.79,
+             "properties": {"type": "resource", "score": 3}},
+            {"id": "rock-2", "shape": "circle", "x_cm": 20.0,
+             "y_cm": 15.0, "radius_cm": 2.5, "properties": {}},
+        ])
 
 
 if __name__ == "__main__":

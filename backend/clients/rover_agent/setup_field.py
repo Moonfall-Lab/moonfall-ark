@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import time
 
@@ -29,6 +30,7 @@ import numpy as np
 from rover_agent.calibration import (Calibrator, aruco_detect,
                                      dict_id_by_name)
 from rover_agent.drive import RoverDrive
+from rover_agent.planner import planning_margin_cm
 from rover_agent.init_direction import (MIN_MOVE_CM, PULSE_PCT, PULSE_SEC,
                                         SAMPLE_SEC, SETTLE_SEC, circ_mean,
                                         load_params, snap_deg,
@@ -107,6 +109,21 @@ def obstacle_summary(obstacle: dict) -> str:
     return (f"{obstacle['id']}: "
             f"({obstacle['x_cm']:.1f},{obstacle['y_cm']:.1f})cm "
             f"r={obstacle['radius_cm']:.1f}cm")
+
+
+def landmarks_json(landmarks) -> str:
+    """输出可直接交给上层或写死到配置中的固定目标 JSON。"""
+    records = []
+    for item in landmarks:
+        records.append({
+            "id": item["id"],
+            "shape": item["shape"],
+            "x_cm": round(float(item["x_cm"]), 2),
+            "y_cm": round(float(item["y_cm"]), 2),
+            "radius_cm": round(float(item["radius_cm"]), 2),
+            "properties": dict(item.get("properties", {})),
+        })
+    return json.dumps(records, ensure_ascii=False, indent=2)
 
 
 def main() -> None:
@@ -302,7 +319,7 @@ def main() -> None:
                      "landmarks": landmarks,
                      "transient_obstacles": [],
                      "obstacles": landmarks},
-                    robot_radius_cm=params["planner"]["robot_radius_cm"],
+                    robot_radius_cm=planning_margin_cm(params),
                     preview_obstacle=preview)
 
             status = ("CALIBRATED" if calib.calibrated
@@ -364,6 +381,8 @@ def main() -> None:
                           f"→ {'OK' if ok else 'FAIL'}")
                 replace_landmarks(params_path, landmarks)
                 print(f"[setup] 写回固定目标 ×{len(landmarks)}")
+                print("[setup] 固定目标 JSON（可复制给上层/写死配置）:")
+                print(landmarks_json(landmarks))
                 msg = (f"已写回 {params_path.name}: 车×{len(robots)} "
                        f"固定目标×{len(landmarks)}——上层可用 fleet 接管了")
             elif ord("1") <= key <= ord("9") and state == "IDLE":

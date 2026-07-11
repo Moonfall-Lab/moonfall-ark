@@ -24,6 +24,7 @@ import cv2
 from rover_agent.fleet import Fleet
 from rover_agent.geometry import dist
 from rover_agent.overlay import draw_overlay
+from rover_agent.planner import planning_margin_cm
 from rover_agent.viz import FONT, load_params
 
 
@@ -172,7 +173,7 @@ def main() -> None:
                     frame, fleet.field.calibrator, fleet.get_obstacles(),
                     robot_states=fleet.rovers, paths=fleet.paths,
                     trails=fleet.trails,
-                    robot_radius_cm=params["planner"]["robot_radius_cm"])
+                    robot_radius_cm=planning_margin_cm(params))
                 h = int(frame.shape[0] * cam_w / frame.shape[1])
                 cv2.imshow("camera", cv2.resize(frame, (cam_w, h)))
             key = cv2.waitKey(30) & 0xFF

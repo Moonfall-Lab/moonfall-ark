@@ -1,10 +1,12 @@
 """回合间可更新的圆形障碍地图。"""
 from __future__ import annotations
 
+import copy
+import json
 import math
 import threading
 
-from rover_agent.planner import build_grid
+from rover_agent.planner import build_grid, planning_margin_cm
 
 
 class ObstacleMap:
@@ -35,20 +37,19 @@ class ObstacleMap:
         with self._lock:
             return {
                 "version": self._version,
-                "landmarks": [dict(item) for item in self._landmarks],
+                "landmarks": copy.deepcopy(self._landmarks),
             }
 
     def transient_snapshot(self) -> dict:
         with self._lock:
             return {
                 "version": self._version,
-                "transient_obstacles": [dict(item)
-                                        for item in self._transient],
+                "transient_obstacles": copy.deepcopy(self._transient),
             }
 
     def _snapshot_unlocked(self) -> dict:
-        landmarks = [dict(item) for item in self._landmarks]
-        transient = [dict(item) for item in self._transient]
+        landmarks = copy.deepcopy(self._landmarks)
+        transient = copy.deepcopy(self._transient)
         return {
             "version": self._version,
             "width_cm": self.width_cm,
@@ -65,8 +66,7 @@ class ObstacleMap:
         with self._lock:
             if not avoid:
                 return self._grid
-            records = [dict(item) for item in
-                       (*self._landmarks, *self._transient)]
+            records = copy.deepcopy([*self._landmarks, *self._transient])
         return build_grid(self.params, self.zones, avoid, obstacles=records)
 
     def replace(self, obstacles) -> dict:
@@ -110,7 +110,7 @@ class ObstacleMap:
         with self._lock:
             source = (self._landmarks if layer == "landmarks"
                       else self._transient)
-            records = [dict(item) for item in source]
+            records = copy.deepcopy(source)
         index = next((i for i, item in enumerate(records)
                       if item["id"] == record["id"]), None)
         if index is None:
@@ -134,7 +134,7 @@ class ObstacleMap:
         with self._lock:
             source = (self._landmarks if layer == "landmarks"
                       else self._transient)
-            records = [dict(item) for item in source]
+            records = copy.deepcopy(source)
         kept = [item for item in records if item["id"] != obstacle_id]
         if len(kept) == len(records):
             raise KeyError(f"未知障碍物: {obstacle_id}")
@@ -146,7 +146,7 @@ class ObstacleMap:
         with self._lock:
             for item in self._landmarks:
                 if item["id"] == landmark_id:
-                    return dict(item)
+                    return copy.deepcopy(item)
         raise KeyError(f"未知固定目标: {landmark_id}")
 
     def landmark_at(self, point) -> dict | None:
@@ -155,7 +155,7 @@ class ObstacleMap:
             for item in self._landmarks:
                 if math.hypot(x - item["x_cm"],
                               y - item["y_cm"]) <= item["radius_cm"]:
-                    return dict(item)
+                    return copy.deepcopy(item)
         return None
 
     def landmark_for_occupied_goal(self, point) -> dict | None:
@@ -173,10 +173,9 @@ class ObstacleMap:
             return None
         x0, x1 = ix * self.cell_cm, (ix + 1) * self.cell_cm
         y0, y1 = iy * self.cell_cm, (iy + 1) * self.cell_cm
-        margin = float(self.params.get("planner", {}).get(
-            "robot_radius_cm", 0.0))
+        margin = planning_margin_cm(self.params)
         with self._lock:
-            landmarks = [dict(item) for item in self._landmarks]
+            landmarks = copy.deepcopy(self._landmarks)
         matches = []
         for item in landmarks:
             cx, cy = item["x_cm"], item["y_cm"]
@@ -228,5 +227,15 @@ class ObstacleMap:
         if (x - radius < 0 or x + radius > self.width_cm
                 or y - radius < 0 or y + radius > self.height_cm):
             raise ValueError("圆形障碍物必须完整位于棋盘内")
-        return {"id": obstacle_id, "shape": "circle",
-                "x_cm": x, "y_cm": y, "radius_cm": radius}
+        record = {"id": obstacle_id, "shape": "circle",
+                  "x_cm": x, "y_cm": y, "radius_cm": radius}
+        if "properties" in obstacle:
+            properties = obstacle["properties"]
+            if not isinstance(properties, dict):
+                raise ValueError("properties 必须是对象")
+            try:
+                json.dumps(properties, ensure_ascii=False, allow_nan=False)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("properties 必须可以编码为 JSON") from exc
+            record["properties"] = copy.deepcopy(properties)
+        return record

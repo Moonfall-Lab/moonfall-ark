@@ -6,8 +6,9 @@
 单阈值下原地转必然转过头、误差反号又超阈值、随即反向重转——现场表现为
 车在原地来回打转不前进。
 
-车无里程计，闭环收敛完全依赖视觉位姿的持续反馈；
-左右电机的天然不对称由该反馈自动纠正，无需标定。
+车无里程计，闭环收敛依赖视觉位姿的持续反馈。大角度转向另使用
+“短脉冲－停车－重新观察”的离散控制，并按左右方向分别标定角速度，
+避免网络延迟把连续转向放大成左右振荡。
 """
 from __future__ import annotations
 
@@ -42,6 +43,32 @@ def cruise_pct_for_speed(params: dict, speed: int) -> int:
         params, speed, "min_cruise_pct", "max_cruise_pct", "cruise_pct")
     quantum = max(1, int(params.get("wheel_step_pct", 5)))
     return _clamp(round(value / quantum) * quantum)
+
+
+def turn_pulse_for_error(error_rad: float, motion_model: dict,
+                         params: dict) -> tuple[tuple[int, int], float]:
+    """把航向误差换算成一次有上限的原地转向脉冲。
+
+    只消除 ``turn_pulse_fraction`` 比例的误差，刻意保留余量给下一次
+    视觉观测修正；左右方向使用各自实测角速度，吸收电机/摩擦差异。
+    """
+    power = int(round(float(motion_model["turn_power_pct"])))
+    if not 0 < power <= 100:
+        raise ValueError("turn_power_pct 必须在 1..100")
+    left = error_rad > 0
+    rate_key = "left_turn_deg_s" if left else "right_turn_deg_s"
+    rate = abs(float(motion_model[rate_key]))
+    if rate <= 0:
+        raise ValueError(f"{rate_key} 必须大于 0")
+    fraction = float(params.get("turn_pulse_fraction", 0.7))
+    minimum = float(params.get("turn_pulse_min_sec", 0.08))
+    maximum = float(params.get("turn_pulse_max_sec", 0.35))
+    if not 0 < fraction <= 1 or minimum <= 0 or maximum < minimum:
+        raise ValueError("转向脉冲参数无效")
+    seconds = abs(error_rad) * 180.0 / 3.141592653589793
+    seconds = max(minimum, min(maximum, seconds * fraction / rate))
+    wheels = (-power, power) if left else (power, -power)
+    return wheels, seconds
 
 
 def step(pose: Pose, waypoints, params: dict, state: dict | None = None,

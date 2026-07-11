@@ -44,6 +44,18 @@ class ObstacleMapTest(unittest.TestCase):
         snapshot["obstacles"][0]["x_cm"] = 1
         self.assertEqual(self.map.snapshot()["obstacles"][0]["x_cm"], 40.0)
 
+    def test_optional_properties_survive_and_snapshot_is_deeply_detached(self):
+        record = dict(ROCK, properties={"type": "resource",
+                                       "tags": ["blue"]})
+        obstacle_map = ObstacleMap(test_params(), landmarks=[record])
+        snapshot = obstacle_map.landmarks_snapshot()
+        self.assertEqual(snapshot["landmarks"][0]["properties"]["type"],
+                         "resource")
+        snapshot["landmarks"][0]["properties"]["tags"].append("changed")
+        self.assertEqual(
+            obstacle_map.landmarks_snapshot()["landmarks"][0]
+            ["properties"]["tags"], ["blue"])
+
     def test_unknown_remove_is_rejected(self):
         with self.assertRaises(KeyError):
             self.map.remove("missing")
@@ -56,6 +68,8 @@ class ObstacleMapTest(unittest.TestCase):
             dict(ROCK, x_cm=math.nan),
             dict(ROCK, x_cm=2, radius_cm=5),
             dict(ROCK, y_cm=59, radius_cm=2),
+            dict(ROCK, properties="not-an-object"),
+            dict(ROCK, properties={"bad": {1, 2}}),
         ]
         for record in invalid:
             with self.subTest(record=record):

@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 
@@ -68,11 +69,21 @@ def upsert_robot(path: pathlib.Path, rid: str, ip: str,
 def _replace_circle_block(path: pathlib.Path, key: str,
                           records: list[dict], empty_comment: str) -> bool:
     if records:
-        items = "\n".join(
-            f"  - {{ id: {o['id']}, shape: {o['shape']}, "
-            f"x_cm: {float(o['x_cm']):.2f}, y_cm: {float(o['y_cm']):.2f}, "
-            f"radius_cm: {float(o['radius_cm']):.2f} }}"
-            for o in records)
+        def line(o):
+            properties = ""
+            if "properties" in o:
+                encoded = json.dumps(
+                    o["properties"], ensure_ascii=False,
+                    separators=(",", ":"))
+                properties = f", properties: {encoded}"
+            return (
+                f"  - {{ id: {o['id']}, shape: {o['shape']}, "
+                f"x_cm: {float(o['x_cm']):.2f}, "
+                f"y_cm: {float(o['y_cm']):.2f}, "
+                f"radius_cm: {float(o['radius_cm']):.2f}"
+                f"{properties} }}")
+
+        items = "\n".join(line(o) for o in records)
         block = f"{key}:   # setup_field 圈选写入\n{items}\n"
     else:
         block = f"{key}: []   # {empty_comment}\n"

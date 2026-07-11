@@ -2,6 +2,7 @@ import importlib.util
 import math
 import time
 import unittest
+from unittest.mock import patch
 
 from tests.rover_helpers import CLIENTS, test_params  # noqa: F401
 
@@ -203,6 +204,57 @@ class RoverDomainTest(unittest.TestCase):
         rover, _ = self.make_rover("r1")
         self.assertFalse(rover.set_goal((100, 100), speed=5))
         self.assertEqual(rover.status, "unreachable")
+
+    def test_failed_new_command_cancels_previous_route(self):
+        rover, drive = self.make_rover("r1")
+        self.assertTrue(rover.set_goal((75, 15), speed=5))
+        del self.field.poses["r1"]
+        rover.params["vision"]["command_pose_wait_sec"] = 0
+
+        self.assertFalse(rover.set_goal((20, 20), speed=5))
+
+        self.assertFalse(rover.plan)
+        self.assertEqual(rover.status, "lost")
+        self.assertEqual(drive.wheels[-1], (0, 0))
+
+    def test_calibrated_turn_pulses_then_waits_for_two_new_poses(self):
+        self.params["motion_models"] = {
+            "default": {
+                "turn_power_pct": 40,
+                "left_turn_deg_s": 130.1,
+                "right_turn_deg_s": 99.9,
+            },
+        }
+        self.params["control"].update({
+            "turn_pulse_fraction": 0.7,
+            "turn_pulse_min_sec": 0.08,
+            "turn_pulse_max_sec": 0.35,
+            "turn_settle_sec": 0.2,
+            "turn_confirm_frames": 2,
+        })
+        self.field.poses["r1"] = Pose(40, 30, 0.0, 1.0)
+        rover, drive = self.make_rover("r1")
+        self.assertTrue(rover.set_goal((40, 55), speed=10))
+
+        with patch("rover_agent.rover.time.monotonic", return_value=10.0):
+            rover.tick()
+        self.assertEqual(drive.wheels[-1], (-40, 40))
+        self.assertEqual(rover.controller_state["turn_phase"], "pulse")
+
+        with patch("rover_agent.rover.time.monotonic", return_value=10.36):
+            rover.tick()
+        self.assertEqual(drive.wheels[-1], (0, 0))
+        self.assertEqual(rover.controller_state["turn_phase"], "observe")
+
+        self.field.poses["r1"] = Pose(40, 30, 0.4, 2.0)
+        with patch("rover_agent.rover.time.monotonic", return_value=10.7):
+            rover.tick()
+        self.assertEqual(rover.controller_state["turn_fresh_count"], 1)
+        self.field.poses["r1"] = Pose(40, 30, 0.7, 3.0)
+        with patch("rover_agent.rover.time.monotonic", return_value=10.8):
+            rover.tick()
+        self.assertEqual(rover.controller_state["turn_phase"], "pulse")
+        self.assertEqual(drive.wheels[-1], (-40, 40))
 
     def test_command_waits_for_temporarily_missing_pose(self):
         field = RecoveringField(Pose(15, 15, 0.0, time.time()))

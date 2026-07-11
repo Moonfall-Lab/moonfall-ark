@@ -97,7 +97,7 @@ class FleetCoordinatorTest(unittest.TestCase):
         self.assertEqual(self.fleet.paths["r2"][-1], (0.9, 0.9))
 
     def test_control_period_comes_from_config(self):
-        self.assertEqual(self.fleet.control_period_s, 0.5)
+        self.assertEqual(self.fleet.control_period_s, 0.1)
 
     def test_obstacle_map_updates_only_between_routes(self):
         rock = {"id": "r", "shape": "circle",

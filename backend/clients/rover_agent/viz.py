@@ -19,6 +19,7 @@ import numpy as np
 import yaml
 
 from rover_agent.vision import PoseStore
+from rover_agent.planner import planning_margin_cm
 
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 
@@ -60,8 +61,8 @@ def render_topview(store: PoseStore, params: dict, grid=None,
         p = int(round(canvas_h - j * cell * scale))
         cv2.line(img, (0, p), (canvas_w, p), (230, 230, 230), 1)
 
-    # 写死的圆柱障碍：实体填红，外圈细线是含车体半径的膨胀边界（路径不会进入）
-    margin = float(params.get("planner", {}).get("robot_radius_cm", 0.0))
+    # 圆柱障碍：实体填红，外圈是车体外接圆 + 安全距离（路径不会进入）
+    margin = planning_margin_cm(params)
     for obs in params.get("obstacles") or ():
         center = to_px(float(obs["x_cm"]), float(obs["y_cm"]))
         cv2.circle(img, center,
@@ -176,7 +177,7 @@ def main() -> None:
                     frame, fleet.field.calibrator, fleet.get_obstacles(),
                     robot_states=fleet.rovers, paths=fleet.paths,
                     trails=fleet.trails,
-                    robot_radius_cm=params["planner"]["robot_radius_cm"])
+                    robot_radius_cm=planning_margin_cm(params))
                 h = int(frame.shape[0] * cam_w / frame.shape[1])
                 view = cv2.resize(frame, (cam_w, h))
             cv2.imshow("camera", view)

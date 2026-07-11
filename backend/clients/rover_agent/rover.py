@@ -5,10 +5,14 @@ import threading
 import time
 import math
 
-from rover_agent.controller import step, validate_speed_level
+from rover_agent.controller import (
+    step,
+    turn_pulse_for_error,
+    validate_speed_level,
+)
 from rover_agent.drive import RoverDrive
 from rover_agent.geometry import heading_error
-from rover_agent.planner import plan, plan_to_landmark
+from rover_agent.planner import plan, plan_to_landmark, vehicle_radius_cm
 
 
 class Rover:
@@ -104,6 +108,7 @@ class Rover:
         if speed == 0:
             self.stop()
             return True
+        self._cancel_active_command()
         pose = self._pose_for_command()
         if pose is None:
             self.status = "lost"
@@ -153,6 +158,7 @@ class Rover:
         if speed == 0:
             self.stop()
             return True
+        self._cancel_active_command()
         pose = self._pose_for_command()
         if pose is None:
             self.status = "lost"
@@ -194,7 +200,7 @@ class Rover:
             grid,
             (pose.x, pose.y),
             landmark,
-            robot_radius_cm=self.params["planner"]["robot_radius_cm"],
+            robot_radius_cm=vehicle_radius_cm(self.params),
             preapproach_gap_cm=control.get(
                 "landmark_preapproach_gap_cm", 4),
             samples=int(control.get("landmark_approach_samples", 24)),
@@ -285,6 +291,8 @@ class Rover:
             if landmark_creep:
                 self._tick_landmark_creep(pose)
                 return
+            if self._advance_turn_pulse(pose):
+                return
             left, right, remaining, done = step(
                 pose,
                 self.plan,
@@ -310,6 +318,26 @@ class Rover:
                 self._debug(
                     f"{self.robot_id} 到达 ({pose.x:.2f},{pose.y:.2f})")
                 return
+            motion_model = self._motion_model()
+            if self.controller_state.get("turning") and motion_model:
+                error = heading_error(pose, remaining[0])
+                wheels, duration = turn_pulse_for_error(
+                    error, motion_model, self.params["control"])
+                now = time.monotonic()
+                self.controller_state.update({
+                    "turn_phase": "pulse",
+                    "turn_until": now + duration,
+                    "turn_fresh_count": 0,
+                    "turn_last_pose_ts": pose.ts,
+                })
+                if hasattr(self.drive, "start_pulse"):
+                    self.drive.start_pulse(*wheels, duration_sec=duration)
+                else:
+                    self.drive.set_wheels(*wheels)
+                self._debug(
+                    f"{self.robot_id} 转向脉冲 err={error:.2f}rad "
+                    f"轮速={wheels} 时长={duration:.3f}s")
+                return
             self.drive.set_wheels(left, right)
             if self._tick_n % 12 == 0:
                 error = heading_error(pose, remaining[0])
@@ -320,13 +348,59 @@ class Rover:
                     f"err={error:.2f}rad 轮速=({left},{right}) "
                     f"udp_err={getattr(self.drive, '_err_count', 0)}")
 
+    def _motion_model(self) -> dict | None:
+        """合并默认标定与单车覆写；未配置时保留旧连续控制。"""
+        models = self.params.get("motion_models", {})
+        default = models.get("default")
+        if not isinstance(default, dict):
+            return None
+        model = dict(default)
+        override = models.get(self.robot_id)
+        if isinstance(override, dict):
+            model.update(override)
+        required = (
+            "turn_power_pct", "left_turn_deg_s", "right_turn_deg_s")
+        return model if all(key in model for key in required) else None
+
+    def _advance_turn_pulse(self, pose) -> bool:
+        """推进“脉冲－停车稳定－两帧新位姿”状态；处理中即返回真。"""
+        phase = self.controller_state.get("turn_phase")
+        if phase not in ("pulse", "observe"):
+            return False
+        now = time.monotonic()
+        if phase == "pulse":
+            if now < float(self.controller_state["turn_until"]):
+                return True
+            self.drive.stop()
+            self.controller_state["turn_phase"] = "observe"
+            self.controller_state["turn_observe_after"] = now + float(
+                self.params["control"].get("turn_settle_sec", 0.2))
+            self.controller_state["turn_last_pose_ts"] = pose.ts
+            self.controller_state["turn_fresh_count"] = 0
+            return True
+
+        if now < float(self.controller_state["turn_observe_after"]):
+            return True
+        if pose.ts != self.controller_state.get("turn_last_pose_ts"):
+            self.controller_state["turn_last_pose_ts"] = pose.ts
+            self.controller_state["turn_fresh_count"] = int(
+                self.controller_state.get("turn_fresh_count", 0)) + 1
+        needed = int(self.params["control"].get("turn_confirm_frames", 2))
+        if self.controller_state["turn_fresh_count"] < needed:
+            return True
+        for key in (
+                "turn_phase", "turn_until", "turn_observe_after",
+                "turn_last_pose_ts", "turn_fresh_count"):
+            self.controller_state.pop(key, None)
+        return False
+
     def _surface_gap(self, point, landmark: dict) -> float:
         center_distance = math.hypot(
             float(point[0]) - float(landmark["x_cm"]),
             float(point[1]) - float(landmark["y_cm"]),
         )
         return (center_distance - float(landmark["radius_cm"])
-                - float(self.params["planner"]["robot_radius_cm"]))
+                - vehicle_radius_cm(self.params))
 
     def _tick_landmark_creep(self, pose) -> None:
         landmark = self._target_landmark
@@ -379,6 +453,15 @@ class Rover:
             self._clear_landmark_state()
             self.drive.stop()
             self._status = "idle"
+
+    def _cancel_active_command(self) -> None:
+        """新命令开始前取消旧路线；首次空闲发令不制造多余停车包。"""
+        with self._lock:
+            active = bool(
+                self.plan or self._target_landmark is not None
+                or self._status in ("moving", "approaching", "lost"))
+        if active:
+            self.stop()
 
     def _clear_landmark_state(self) -> None:
         self._target_landmark = None

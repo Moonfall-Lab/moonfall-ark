@@ -5,6 +5,7 @@ from tests.rover_helpers import CLIENTS, test_params  # noqa: F401
 
 from rover_agent.planner import (  # noqa: E402
     OccupancyGrid, build_grid, plan, plan_cells, plan_to_landmark,
+    planning_margin_cm, vehicle_radius_cm,
 )
 
 
@@ -143,6 +144,26 @@ class CircleObstacleTest(unittest.TestCase):
         self.assertTrue(grid.occupied(30, 30), "应叠加车体半径膨胀")
         self.assertTrue(build_grid(test_params()).is_free(40, 30),
                         "无障碍配置应全空闲")
+
+    def test_half_width_and_safety_clearance_are_both_inflated(self):
+        params = test_params()
+        params["planner"] = {
+            "vehicle_length_cm": 6,
+            "vehicle_width_cm": 5.5,
+            "safety_clearance_cm": 0.5,
+            "inflate_cells": 1,
+        }
+        self.assertAlmostEqual(vehicle_radius_cm(params), math.hypot(3, 2.75))
+        self.assertAlmostEqual(
+            planning_margin_cm(params), 2.75 + 0.5)
+        params["obstacles"] = [{
+            "id": "c", "shape": "circle",
+            "x_cm": 40, "y_cm": 30, "radius_cm": 5,
+        }]
+        grid = build_grid(params)
+        self.assertTrue(grid.occupied(48, 30),
+                        "障碍实体应叠加半车宽和 0.5cm 安全距离")
+        self.assertTrue(grid.is_free(49, 30))
 
     def test_build_grid_combines_zones_and_circles(self):
         params = test_params()

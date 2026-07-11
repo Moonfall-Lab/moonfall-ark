@@ -69,7 +69,8 @@ class ParamsIoTest(unittest.TestCase):
     def test_replace_landmarks(self):
         replace_landmarks(self.path, [
             {"id": "rock-3", "shape": "circle",
-             "x_cm": 50, "y_cm": 25, "radius_cm": 5.5},
+             "x_cm": 50, "y_cm": 25, "radius_cm": 5.5,
+             "properties": {"type": "resource", "score": 3}},
         ])
         text = self.path.read_text()
         self.assertIn("id: rock-3", text)
@@ -81,6 +82,8 @@ class ParamsIoTest(unittest.TestCase):
         import yaml
         data = yaml.safe_load(text)   # 改完仍是合法 yaml
         self.assertEqual(len(data["landmarks"]), 1)
+        self.assertEqual(data["landmarks"][0]["properties"],
+                         {"type": "resource", "score": 3})
 
     def test_replace_landmarks_empty(self):
         replace_landmarks(self.path, [])
@@ -95,7 +98,14 @@ class ParamsIoTest(unittest.TestCase):
             "width_cm": 80, "height_cm": 60, "cell_cm": 1,
         })
         self.assertEqual(params["control"]["arrive_tol_cm"], 2)
-        self.assertEqual(params["landmarks"], [])
+        # setup_field 会把现场圈选结果写回同一文件；测试单位口径而非
+        # 强迫现场地图为空，否则完成初始化后测试必然误报。
+        for landmark in params["landmarks"]:
+            self.assertIn("x_cm", landmark)
+            self.assertIn("y_cm", landmark)
+            self.assertIn("radius_cm", landmark)
+            self.assertNotIn("x_m", landmark)
+            self.assertNotIn("y_m", landmark)
         self.assertNotIn("obstacles", params)
         self.assertEqual(params["control"]["landmark_gap_min_cm"], 1)
         self.assertEqual(params["control"]["landmark_gap_max_cm"], 2)

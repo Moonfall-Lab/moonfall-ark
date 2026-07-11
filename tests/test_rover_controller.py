@@ -170,6 +170,36 @@ class HysteresisTest(unittest.TestCase):
         self.assertFalse(st["turning"])
 
 
+class TurnPulseTest(unittest.TestCase):
+    MODEL = {
+        "turn_power_pct": 40,
+        "left_turn_deg_s": 130.1,
+        "right_turn_deg_s": 99.9,
+    }
+    CONTROL = {
+        "turn_pulse_fraction": 0.7,
+        "turn_pulse_min_sec": 0.08,
+        "turn_pulse_max_sec": 0.35,
+    }
+
+    def test_direction_specific_rates_produce_different_pulse_lengths(self):
+        left_wheels, left_sec = controller.turn_pulse_for_error(
+            math.radians(30), self.MODEL, self.CONTROL)
+        right_wheels, right_sec = controller.turn_pulse_for_error(
+            math.radians(-30), self.MODEL, self.CONTROL)
+
+        self.assertEqual(left_wheels, (-40, 40))
+        self.assertEqual(right_wheels, (40, -40))
+        self.assertAlmostEqual(left_sec, 0.7 * 30 / 130.1)
+        self.assertAlmostEqual(right_sec, 0.7 * 30 / 99.9)
+        self.assertGreater(right_sec, left_sec)
+
+    def test_small_error_respects_minimum_pulse(self):
+        _, duration = controller.turn_pulse_for_error(
+            math.radians(2), self.MODEL, self.CONTROL)
+        self.assertEqual(duration, 0.08)
+
+
 class KinematicSimTest(unittest.TestCase):
     """理想差速模型仿真：沿 A* 路径闭环收敛到目标。"""
 

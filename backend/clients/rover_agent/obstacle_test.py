@@ -27,6 +27,7 @@ import cv2
 from rover_agent.fleet import Fleet
 from rover_agent.geometry import dist
 from rover_agent.overlay import draw_overlay
+from rover_agent.planner import planning_margin_cm
 from rover_agent.viz import FONT, load_params, render_topview
 
 
@@ -114,8 +115,8 @@ class ObstacleTest:
         ox, oy, orad = self.obstacle
         self.log(f"=== 绕障联调测试 {time.strftime('%H:%M:%S')} ===")
         self.log(f"障碍圆柱: 圆心 ({ox:.1f}, {oy:.1f})cm，半径 {orad:.1f}cm；"
-                 f"栅格中已按 +车体半径 "
-                 f"{self.fleet.params['planner']['robot_radius_cm']:.0f}cm 膨胀")
+                 f"栅格中已按 +车体/安全距离 "
+                 f"{planning_margin_cm(self.fleet.params):.1f}cm 膨胀")
 
         if not wait_until(lambda: self.calib.calibrated or self.aborted, 30):
             self.log("FAIL [标定] 30s 内未同时看到 4 个角标记")
@@ -224,7 +225,7 @@ def main() -> None:
                     frame, fleet.field.calibrator, fleet.get_obstacles(),
                     robot_states=fleet.rovers, paths=fleet.paths,
                     trails=test.trails,
-                    robot_radius_cm=params["planner"]["robot_radius_cm"])
+                    robot_radius_cm=planning_margin_cm(params))
                 fh = int(frame.shape[0] * cam_w / frame.shape[1])
                 cv2.imshow("camera", cv2.resize(frame, (cam_w, fh)))
             key = cv2.waitKey(30) & 0xFF

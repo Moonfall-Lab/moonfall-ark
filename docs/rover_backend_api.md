@@ -171,6 +171,80 @@ Topic：`state.event`
 {"topic":"cmd.rover_map","source":"runtime","timestamp":1720000000.0,"payload":{"action":"get_landmarks","command_id":"map-1"}}
 ```
 
+### 5.1 当前场地固定目标
+
+当前场地重新标注后的五个固定目标如下。`properties` 是上层业务使用的
+可扩展属性对象；路径规划只读取 `shape / x_cm / y_cm / radius_cm`，不会
+根据业务属性改变路线。
+
+```json
+[
+  {
+    "id": "obstacle-1",
+    "shape": "circle",
+    "x_cm": 19.22,
+    "y_cm": 52.58,
+    "radius_cm": 5.82,
+    "properties": {
+      "type": "energy_station"
+    }
+  },
+  {
+    "id": "obstacle-2",
+    "shape": "circle",
+    "x_cm": 61.51,
+    "y_cm": 51.09,
+    "radius_cm": 5.44,
+    "properties": {
+      "type": "ruins"
+    }
+  },
+  {
+    "id": "obstacle-3",
+    "shape": "circle",
+    "x_cm": 37.37,
+    "y_cm": 29.88,
+    "radius_cm": 5.77,
+    "properties": {
+      "type": "high_energy_station"
+    }
+  },
+  {
+    "id": "obstacle-4",
+    "shape": "circle",
+    "x_cm": 12.71,
+    "y_cm": 10.16,
+    "radius_cm": 5.94,
+    "properties": {
+      "type": "ruins"
+    }
+  },
+  {
+    "id": "obstacle-5",
+    "shape": "circle",
+    "x_cm": 61.83,
+    "y_cm": 13.9,
+    "radius_cm": 5.41,
+    "properties": {
+      "type": "energy_station"
+    }
+  }
+]
+```
+
+业务属性取值约定：
+
+| 字段 | 取值 | 含义 |
+| --- | --- | --- |
+| `properties.type` | `energy_station` | 能源站 |
+| `properties.type` | `high_energy_station` | 高能能源站 |
+| `properties.type` | `ruins` | 遗迹 |
+
+`get_landmarks` 返回这些几何字段和业务属性。以后增加阵营、分值或资源量时，
+继续写入 `properties`，不要修改几何字段含义。
+
+### 5.2 临时障碍
+
 替换本回合临时障碍：
 
 ```json

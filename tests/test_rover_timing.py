@@ -68,7 +68,7 @@ class TimingSplitTest(unittest.TestCase):
                 health=False, debug=lambda _message: None,
             )
         try:
-            self.assertEqual(fleet.control_period_s, 0.5)
+            self.assertEqual(fleet.control_period_s, 0.1)
         finally:
             fleet.shutdown()
 
@@ -80,8 +80,16 @@ class TimingSplitTest(unittest.TestCase):
             "theta_offset_deg": 0,
         })
         self.assertEqual(params["drive"]["keepalive_period_ms"], 250)
-        self.assertEqual(params["planner"]["robot_radius_cm"], 2)
+        self.assertEqual(params["planner"]["vehicle_length_cm"], 6)
+        self.assertEqual(params["planner"]["vehicle_width_cm"], 5.5)
+        self.assertEqual(params["planner"]["safety_clearance_cm"], 0.5)
         self.assertEqual(params["vision"]["command_pose_wait_sec"], 2)
+        self.assertEqual(params["motion_models"]["default"], {
+            "straight_speed_cm_s": {5: 5.48, 10: 8.91},
+            "turn_power_pct": 40,
+            "left_turn_deg_s": 130.1,
+            "right_turn_deg_s": 99.9,
+        })
 
     def test_field_config_registers_second_rover(self):
         params = load_params()

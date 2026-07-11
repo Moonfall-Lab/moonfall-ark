@@ -2,7 +2,7 @@
 
 障碍三个来源，统一由 build_grid() 汇总：
 1. **圆形地图对象（主用）**：固定目标与内存临时障碍的圆心/半径（厘米），
-   叠加 `planner.robot_radius_cm`（车体半径 + 安全余量）膨胀后，按"格子矩形与圆精确判交"
+   叠加半车宽与 `safety_clearance_cm` 膨胀后，按"格子矩形与圆精确判交"
    投影到栅格；
 2. 游戏配置 map.zones 中 kind ∈ {obstacle, hazard, trap} 且 active 的区域
    （zone center 也是厘米坐标，按规划格膨胀 inflate_cells 圈）；
@@ -20,6 +20,38 @@ from rover_agent.geometry import CELL_CM, cell_center, world_to_cell
 
 OBSTACLE_KINDS = {"obstacle", "hazard", "trap"}
 SQRT2 = math.sqrt(2.0)
+
+
+def vehicle_radius_cm(params: dict) -> float:
+    """返回车体中心到最远角的距离；旧配置回退到 robot_radius_cm。"""
+    cfg = params.get("planner", {})
+    length = cfg.get("vehicle_length_cm")
+    width = cfg.get("vehicle_width_cm")
+    if length is None or width is None:
+        return float(cfg.get("robot_radius_cm", 0.0))
+    length, width = float(length), float(width)
+    if length <= 0 or width <= 0:
+        raise ValueError("vehicle_length_cm/vehicle_width_cm 必须大于 0")
+    return math.hypot(length / 2.0, width / 2.0)
+
+
+def planning_margin_cm(params: dict) -> float:
+    """圆障碍的横向外扩：半车宽 + 额外安全距离。
+
+    A* 路径描述车体中心的行驶轨迹；正常通过窄通道时车头沿路线方向，
+    因此横向碰撞约束由车宽决定。车长仍用于原地转向和固定目标贴近。
+    """
+    cfg = params.get("planner", {})
+    clearance = float(cfg.get("safety_clearance_cm", 0.0))
+    if clearance < 0:
+        raise ValueError("safety_clearance_cm 不能小于 0")
+    width = cfg.get("vehicle_width_cm")
+    if width is None:
+        return vehicle_radius_cm(params) + clearance
+    width = float(width)
+    if width <= 0:
+        raise ValueError("vehicle_width_cm 必须大于 0")
+    return width / 2.0 + clearance
 
 
 class OccupancyGrid:
@@ -209,7 +241,7 @@ def build_grid(params: dict, zones=(), avoid=(), obstacles=None) -> OccupancyGri
     """汇总三类障碍构建栅格（Rover / viz 统一走这里）。
 
     - obstacles：调用方合并后的固定目标与临时圆形障碍；
-      每个叠加 params["planner"]["robot_radius_cm"] 膨胀；
+      每个叠加半车宽与额外安全距离膨胀；
     - zones / avoid：游戏配置区域与 cmd.robot 点名回避（兼容保留）。
     """
     planner_cfg = params.get("planner", {})
@@ -219,7 +251,7 @@ def build_grid(params: dict, zones=(), avoid=(), obstacles=None) -> OccupancyGri
     ny = int(round(float(table["height_cm"]) / cell))
     grid = OccupancyGrid.from_zones(
         nx, zones, avoid, int(planner_cfg.get("inflate_cells", 1)), ny=ny)
-    margin = float(planner_cfg.get("robot_radius_cm", 0.0))
+    margin = planning_margin_cm(params)
     circles = ((params.get("obstacles") or ())
                if obstacles is None else obstacles)
     for obs in circles:
