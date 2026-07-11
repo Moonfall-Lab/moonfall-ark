@@ -114,7 +114,7 @@ inputs:
     # 遗迹卡：强力一次性
     - { id: teleport_steal, type: relic, name: 瞬移偷窃, effect: 本回合抽走任意一名玩家的一张手牌 }
     - { id: dust_ward, type: relic, name: 月尘护符, effect: 本回合己方机器人免疫月尘效果 }
-    - { id: ark_repair, type: relic, name: 方舟修复核心, effect: 己方飞船 HP +1，最高不超过 3 }
+    - { id: ark_repair, type: relic, name: 核心修复, effect: 己方飞船 HP +1，最高不超过 3 }
     - { id: concurrent_ops, type: relic, name: 并发任务, effect: 本回合可连续打出行为倾向卡 }
 
 director:
