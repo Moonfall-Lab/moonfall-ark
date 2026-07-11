@@ -14,6 +14,24 @@ from app.main import app  # noqa: E402
 
 
 class MinimalRuntimeContractTest(unittest.TestCase):
+    def test_qr_skill_is_validated_and_broadcast(self):
+        with TestClient(app) as client:
+            with client.websocket_connect("/ws") as websocket:
+                websocket.receive_json()
+                websocket.send_json({
+                    "topic": "input.qr_skill", "source": "insta360_link_2c",
+                    "timestamp": 1.0,
+                    "payload": {
+                        "qr_text": "采集优先", "skill_id": "collect_priority",
+                        "skill_name": "采集优先",
+                    },
+                })
+                event = websocket.receive_json()
+
+        self.assertEqual(event["topic"], "state.event")
+        self.assertEqual(event["payload"]["event_type"], "qr_skill_detected")
+        self.assertEqual(event["payload"]["data"]["skill_id"], "collect_priority")
+
     def test_pose_message_updates_r0_in_centimeters(self):
         with TestClient(app) as client:
             with client.websocket_connect("/ws") as websocket:

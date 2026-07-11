@@ -12,6 +12,7 @@ TOPIC_STATE_WORLD = "state.world"
 TOPIC_STATE_EVENT = "state.event"
 TOPIC_INPUT_VOICE = "input.voice"
 TOPIC_INPUT_CARD = "input.card"
+TOPIC_INPUT_QR_SKILL = "input.qr_skill"
 TOPIC_INPUT_DECLARE_LAUNCH = "input.declare_launch"
 TOPIC_INPUT_DEBUG = "input.debug"
 TOPIC_SENSOR_HR = "sensor.hr"
@@ -28,6 +29,7 @@ KNOWN_TOPICS = {
     TOPIC_STATE_EVENT,
     TOPIC_INPUT_VOICE,
     TOPIC_INPUT_CARD,
+    TOPIC_INPUT_QR_SKILL,
     TOPIC_INPUT_DECLARE_LAUNCH,
     TOPIC_INPUT_DEBUG,
     TOPIC_SENSOR_HR,
