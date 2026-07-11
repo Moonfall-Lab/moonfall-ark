@@ -1,0 +1,31 @@
+# ArUco ID → 卡牌名称映射
+# 每张卡牌贴一个 ArUco 标记，ID 从 1 开始
+# 与 moonfall.yaml 中的 inputs.cards 对应
+
+corners:
+  # 桌面四角的 ArUco 标记（用于校准）
+  marker_ids: [50, 51, 52, 53]
+  auto_assign: true
+
+table:
+  # 桌面尺寸（厘米）
+  width_cm: 120.0
+  height_cm: 120.0
+
+aruco_dict: DICT_4X4_50
+
+# 卡牌 ArUco ID 映射
+cards:
+  1: { id: collect_priority, name: 采集优先 }
+  2: { id: return_settle, name: 返航结算 }
+  3: { id: explore_relic, name: 探索遗迹 }
+  4: { id: ignition_protocol, name: 点火协议 }
+  5: { id: moonrock_strike, name: 月岩炮击 }
+  6: { id: fuel_raid, name: 燃料掠夺 }
+  7: { id: moon_prophecy, name: 月相预言 }
+  8: { id: divine_prayer, name: 神之祈愿 }
+  9: { id: emergency_shield, name: 紧急护盾 }
+  10: { id: teleport_steal, name: 瞬移偷窃 }
+  11: { id: dust_ward, name: 月尘护符 }
+  12: { id: ark_repair, name: 核心修复 }
+  13: { id: concurrent_ops, name: 并发任务 }

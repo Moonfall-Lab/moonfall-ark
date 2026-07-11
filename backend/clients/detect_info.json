@@ -1,0 +1,12 @@
+{
+  "image_size": {
+    "width": 1280,
+    "height": 720
+  },
+  "detect_found": false,
+  "decode_text": null,
+  "multi_detect_ok": false,
+  "multi_texts": [],
+  "qr_points": null,
+  "has_straight_qr": false
+}
