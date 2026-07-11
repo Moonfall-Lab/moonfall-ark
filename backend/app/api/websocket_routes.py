@@ -13,6 +13,7 @@ from app.core.constants import (
     TOPIC_INPUT_CARD,
     TOPIC_INPUT_DECLARE_LAUNCH,
     TOPIC_INPUT_VOICE,
+    TOPIC_PERCEPTION_POSE,
     TOPIC_SENSOR_HR,
     TOPIC_STATE_EVENT,
     TOPIC_STATE_WORLD,
@@ -105,6 +106,12 @@ async def route_message(websocket: WebSocket, message: RuntimeMessage) -> None:
         if message.topic == TOPIC_SENSOR_HR:
             await _handle_sensor_hr(message)
             return
+        if message.topic == TOPIC_PERCEPTION_POSE:
+            _handle_perception_pose(message)
+            return
+        if message.topic == TOPIC_STATE_EVENT:
+            await _handle_rover_event(message)
+            return
         if message.topic == TOPIC_INPUT_VOICE:
             await _handle_input_voice(message)
             return
@@ -138,6 +145,34 @@ async def _handle_sensor_hr(message: RuntimeMessage) -> None:
     payload = message.payload
     state_manager.update_player_hr(str(payload["player_id"]), int(payload["heart_rate"]))
     await manager.broadcast(make_message(TOPIC_STATE_WORLD, state_manager.get_state_dict()))
+
+
+def _handle_perception_pose(message: RuntimeMessage) -> None:
+    payload = message.payload
+    car_id = payload.get("car_id") or payload.get("robot_id")
+    if not car_id:
+        raise ValueError("car_id or robot_id is required")
+    get_world_state_manager().update_unit_pose(
+        str(car_id), float(payload["x"]), float(payload["y"]),
+        float(payload["theta"]), str(payload.get("status", "idle")),
+    )
+
+
+async def _handle_rover_event(message: RuntimeMessage) -> None:
+    payload = message.payload
+    event_type = str(payload.get("event_type", ""))
+    if event_type not in {"robot_arrived", "robot_unreachable"}:
+        raise ValueError(f"unsupported device event: {event_type}")
+    car_id = payload.get("car_id") or payload.get("robot_id")
+    if not car_id:
+        raise ValueError("car_id or robot_id is required")
+    status = "arrived" if event_type == "robot_arrived" else "unreachable"
+    unit = get_world_state_manager().unit_by_id(str(car_id))
+    if unit is not None:
+        unit.status = status
+    log_event(get_world_state_manager().get_state().session_id,
+              TOPIC_STATE_EVENT, message.source, payload)
+    await manager.broadcast(make_message(TOPIC_STATE_EVENT, payload))
 
 
 async def _handle_input_voice(message: RuntimeMessage) -> None:

@@ -48,28 +48,28 @@ factions:
 
 units:
   # 每台小车初始停在自己阵营的飞船角
-  - id: r1
+  - id: r0
     faction: pa
     kind: rover
-    pose: { x: 1.0, y: 1.0, theta: 0.79 }
+    pose: { x: 5.0, y: 5.0, theta: 0.79 }
+    status: idle
+    carrying:
+  - id: r1
+    faction: pb
+    kind: rover
+    pose: { x: 75.0, y: 5.0, theta: 2.36 }
     status: idle
     carrying:
   - id: r2
-    faction: pb
+    faction: pc
     kind: rover
-    pose: { x: 11.0, y: 1.0, theta: 2.36 }
+    pose: { x: 5.0, y: 55.0, theta: -0.79 }
     status: idle
     carrying:
   - id: r3
-    faction: pc
-    kind: rover
-    pose: { x: 1.0, y: 11.0, theta: -0.79 }
-    status: idle
-    carrying:
-  - id: r4
     faction: pd
     kind: rover
-    pose: { x: 11.0, y: 11.0, theta: -2.36 }
+    pose: { x: 75.0, y: 55.0, theta: -2.36 }
     status: idle
     carrying:
 

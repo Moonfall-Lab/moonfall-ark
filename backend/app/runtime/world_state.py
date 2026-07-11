@@ -125,6 +125,18 @@ class WorldStateManager:
             if action == "return":
                 unit.carrying = None
 
+    def update_unit_pose(
+        self, car_id: str, x: float, y: float, theta: float, status: str,
+    ) -> UnitState | None:
+        """Store the rover's physical pose in the shared centimeter frame."""
+        with self._lock:
+            unit = self.unit_by_id(car_id)
+            if unit is None:
+                return None
+            unit.pose = Pose(x=float(x), y=float(y), theta=float(theta))
+            unit.status = str(status)
+            return unit
+
     def faction_for_player(self, player_id: str | None) -> FactionState | None:
         if player_id is None:
             return None
