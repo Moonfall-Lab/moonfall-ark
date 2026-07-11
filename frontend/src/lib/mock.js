@@ -26,6 +26,8 @@ export const MOCK_CONFIG = {
   factions: [
     { id: 'pa', name: 'PIONEER A', players: ['p1'] },
     { id: 'pb', name: 'PIONEER B', players: ['p2'] },
+    { id: 'pc', name: 'PIONEER C', players: ['p3'] },
+    { id: 'pd', name: 'PIONEER D', players: ['p4'] },
   ],
   inputs: { cards: [] },
 }
@@ -33,17 +35,19 @@ export const MOCK_CONFIG = {
 const tierOf = (r) => (r < 25 ? 'sleep' : r < 50 ? 'alert' : r < 80 ? 'anger' : 'endgame')
 // 真实场地：80cm × 60cm，坐标单位 = cm / 10（3D 世界单位）
 // 原点在左下角，x 范围 0-8，y 范围 0-6
-const SHIP = { pa: [0.5, 0.5], pb: [7.5, 0.5] }
+const SHIP = { pa: [0.5, 0.5], pb: [7.5, 0.5], pc: [0.5, 5.5], pd: [7.5, 5.5] }
 const TARGETS = [
   [1.92, 5.26], // energy_w
   [6.15, 5.11], // ruins_ne
   [3.74, 2.99], // central_hi
   [1.27, 1.02], // ruins_sw
   [6.18, 1.39], // energy_se
-  [0.5, 0.5],   // 回基地
-  [7.5, 0.5],   // 回基地
+  [0.5, 0.5],   // 回基地 pa
+  [7.5, 0.5],   // 回基地 pb
+  [0.5, 5.5],   // 回基地 pc
+  [7.5, 5.5],   // 回基地 pd
 ]
-const FIDS = ['pa', 'pb']
+const FIDS = ['pa', 'pb', 'pc', 'pd']
 
 export function startMock({ onState, onEvent }) {
   let turn = 1
@@ -63,7 +67,7 @@ export function startMock({ onState, onEvent }) {
     },
   }))
 
-  const units = ['r0', 'r1'].map((id, i) => {
+  const units = ['r0', 'r1', 'r2', 'r3'].map((id, i) => {
     const faction = FIDS[i]
     const [x, y] = SHIP[faction]
     return { id, faction, kind: 'rover', pose: { x, y, theta: 0 }, status: 'idle', carrying: null, _tx: x, _ty: y }

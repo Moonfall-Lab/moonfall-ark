@@ -4,6 +4,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { FACTION_COLORS } from '../lib/factions'
 
@@ -20,6 +21,7 @@ const MODELS = {
   relic_bottom: 'altar2',
   hazard: 'dust_device',
   obstacle: 'meteor',
+  rover: 'rover',
 }
 const KIND_COLOR = {
   base: 0x00f2ff,
@@ -198,11 +200,12 @@ export default class MoonScene {
     tex.colorSpace = THREE.SRGBColorSpace
     tex.wrapS = tex.wrapT = THREE.MirroredRepeatWrapping
     tex.repeat.set(2.2, 2.2)
-    tex.anisotropy = 8
+    tex.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy())
 
     // 带起伏的月面：场地区域保持平整，四周隆起随机丘陵
     const size = 80
-    const seg = 120
+    // 72×72 已足够覆盖远景起伏，比原 120×120 少约 64% 顶点与法线计算。
+    const seg = 72
     const geo = new THREE.PlaneGeometry(size, size, seg, seg)
     const pos = geo.attributes.position
     for (let i = 0; i < pos.count; i++) {
@@ -431,22 +434,23 @@ export default class MoonScene {
   }
 
   // ---------- 模型 ----------
-  // 所有 GLB 顺序加载；单个资源失败时，对应区域自动使用占位体。
+  // GLB 并行加载；单个资源失败时，对应区域自动使用占位体。
   async _loadModels() {
     const names = [...new Set(Object.values(MODELS))]
     const loader = new GLTFLoader()
+    loader.setMeshoptDecoder(MeshoptDecoder)
+    let completed = 0
 
-    // 顺序加载，避免多个大模型同时抢占网络和解析资源。
-    for (let i = 0; i < names.length; i++) {
-      const name = names[i]
+    await Promise.all(names.map(async (name) => {
       try {
         const gltf = await loader.loadAsync(`/assets/models/${name}.glb`)
         this.models[name] = gltf.scene
       } catch (error) {
         console.error(`Failed to load ${name}.glb; using placeholder instead.`, error)
       }
-      this.onProgress(Math.round(((i + 1) / names.length) * 100))
-    }
+      completed += 1
+      this.onProgress(Math.round((completed / names.length) * 100))
+    }))
 
     if (!this._disposed) this._modelsReady()
   }
@@ -619,38 +623,35 @@ export default class MoonScene {
   _makeRover(fid) {
     const color = new THREE.Color(FACTION_COLORS[fid] || '#8899aa')
     const g = new THREE.Group()
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(0.42, 0.16, 0.6),
-      new THREE.MeshStandardMaterial({ color: 0x222a33, metalness: 0.85, roughness: 0.35 })
-    )
-    body.position.y = 0.22
-    g.add(body)
-    const stripe = new THREE.Mesh(
-      new THREE.BoxGeometry(0.44, 0.05, 0.62),
-      new THREE.MeshStandardMaterial({ color: color.clone().multiplyScalar(0.4), emissive: color, emissiveIntensity: 1.6, metalness: 0.4, roughness: 0.4 })
-    )
-    stripe.position.y = 0.3
-    g.add(stripe)
-    const wheelGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.06, 12)
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x11151b, roughness: 0.9 })
-    ;[-0.2, 0.02, 0.24].forEach((zz) => {
-      ;[-0.24, 0.24].forEach((xx) => {
-        const w = new THREE.Mesh(wheelGeo, wheelMat)
-        w.rotation.z = Math.PI / 2
-        w.position.set(xx, 0.09, zz - 0.02)
-        g.add(w)
+    const rover = this.models.rover?.clone(true)
+    if (rover) {
+      const bounds = new THREE.Box3().setFromObject(rover)
+      const size = bounds.getSize(new THREE.Vector3())
+      const scale = 0.68 / Math.max(size.x, size.z)
+      rover.scale.setScalar(scale)
+      bounds.setFromObject(rover)
+      const center = bounds.getCenter(new THREE.Vector3())
+      rover.position.set(-center.x, -bounds.min.y + 0.03, -center.z)
+      rover.traverse((o) => {
+        if (o.isMesh) {
+          o.castShadow = false
+          o.receiveShadow = false
+        }
       })
-    })
-    // 桅杆信标
-    const mastO = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 10), new THREE.MeshBasicMaterial({ color }))
-    mastO.position.set(0, 0.52, -0.18)
-    g.add(mastO)
-    const mast = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.012, 0.012, 0.2, 6),
-      new THREE.MeshStandardMaterial({ color: 0x445566, metalness: 0.8, roughness: 0.4 })
-    )
-    mast.position.set(0, 0.4, -0.18)
-    g.add(mast)
+      g.add(rover)
+    } else {
+      const fallback = new THREE.Mesh(
+        new THREE.BoxGeometry(0.42, 0.16, 0.6),
+        new THREE.MeshStandardMaterial({ color: 0x222a33, metalness: 0.85, roughness: 0.35 })
+      )
+      fallback.position.y = 0.22
+      g.add(fallback)
+    }
+
+    // 阵营色信标，真实模型保持原材质，仅用灯光区分玩家。
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), new THREE.MeshBasicMaterial({ color }))
+    beacon.position.set(0, 0.48, -0.16)
+    g.add(beacon)
     const l = new THREE.PointLight(color, 2.5, 3.2, 2)
     l.position.y = 0.6
     g.add(l)
@@ -948,8 +949,8 @@ export default class MoonScene {
       }
       u.trail.geometry.attributes.position.array.set(u.trailData)
       u.trail.geometry.attributes.position.needsUpdate = true
-      // 悬浮呼吸
-      r.children[0] && (r.children[0].position.y = 0.22 + Math.sin(t * 2.4 + r.id) * 0.008)
+      // 信标呼吸
+      r.children[1] && (r.children[1].scale.setScalar(0.9 + Math.sin(t * 2.4 + r.id) * 0.1))
     })
 
     // 区域光环脉冲

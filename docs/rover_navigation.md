@@ -113,7 +113,7 @@ y_cell = y_cm
 ```yaml
 robots:
   r0: { ip: "10.202.241.122", marker_id: 0, theta_offset_deg: 0 }
-  r1: { ip: "10.202.241.220", marker_id: 1, theta_offset_deg: 0 }
+  r1: { ip: "10.202.241.221", marker_id: 1, theta_offset_deg: 0 }
 ```
 
 四辆车采用固定映射：车顶标记 `0/1/2/3` 分别对应 `car_id`
