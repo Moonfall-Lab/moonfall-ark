@@ -4,6 +4,9 @@
 完整技术说明与接口见 `docs/rover_navigation.md`；历史设计与任务分解见
 `docs/superpowers/plans/2026-07-10-vision-nav-rover-agent.md`。
 
+只运行“棋盘定位 + 坐标导航”的跨电脑部署步骤，见
+[`docs/rover_coordinate_baseline_quickstart.md`](../../../docs/rover_coordinate_baseline_quickstart.md)。
+
 ## 现场部署清单
 
 1. **组网**：电脑与所有小车连同一个热点；在热点管理里给每台车**固定 DHCP 租约**（车的 IP 显示在车载 OLED 上），填进 `params.yaml` 的 `robots.<id>.ip`。
@@ -75,7 +78,7 @@ with Fleet(camera=0) as fleet:        # 拉起视觉 + 控制线程
 | `table.width_cm / height_cm / cell_cm` | `80 / 60 / 1` 厘米地图 | 棋盘尺寸变化时修改 |
 | `landmarks` | 开场手动画入的固定目标 | 由 `setup_field` 写入并长期保存 |
 | `planner.vehicle_length_cm / vehicle_width_cm` | 真实车体尺寸，当前 `6 × 5.5cm` | 路径横向外扩使用半车宽；车长参与贴近距离计算 |
-| `planner.safety_clearance_cm` | 车体侧边之外的额外避障距离，当前 0.5cm | 擦碰 → 调大；通道被封死 → 谨慎调小 |
+| `planner.safety_clearance_cm` | 车体侧边之外的额外避障距离，当前 1cm | 擦碰 → 调大；通道被封死 → 谨慎调小 |
 | `vision.ema_alpha` | 位姿平滑，1=不平滑 | 坐标抖 → 调小（如 0.3） |
 | `vision.stale_sec` | 位姿过期即刹车 | 检测帧率低 → 适当放大 |
 | `vision.command_pose_wait_sec` | 发令瞬间丢码时等待恢复，默认 2 秒 | 现场识别闪烁时保留默认值 |

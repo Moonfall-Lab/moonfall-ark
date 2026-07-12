@@ -82,7 +82,7 @@ class TimingSplitTest(unittest.TestCase):
         self.assertEqual(params["drive"]["keepalive_period_ms"], 250)
         self.assertEqual(params["planner"]["vehicle_length_cm"], 6)
         self.assertEqual(params["planner"]["vehicle_width_cm"], 5.5)
-        self.assertEqual(params["planner"]["safety_clearance_cm"], 0.5)
+        self.assertEqual(params["planner"]["safety_clearance_cm"], 1.0)
         self.assertEqual(params["vision"]["command_pose_wait_sec"], 2)
         self.assertEqual(params["motion_models"]["default"], {
             "straight_speed_cm_s": {5: 5.48, 10: 8.91},
@@ -94,7 +94,7 @@ class TimingSplitTest(unittest.TestCase):
     def test_field_config_registers_second_rover(self):
         params = load_params()
         self.assertEqual(params["robots"]["r1"], {
-            "ip": "10.202.241.221",
+            "ip": "10.202.241.220",
             "marker_id": 1,
             "theta_offset_deg": 0,
         })

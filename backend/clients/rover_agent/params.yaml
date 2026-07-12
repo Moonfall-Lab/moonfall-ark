@@ -63,6 +63,7 @@ control:
   waypoint_tol_cm: 3  # 中间路径点到达判定
   arrive_tol_cm: 2    # 支持最短 5cm 移动；进入后停车并锁定 arrived
   landmark_preapproach_gap_cm: 4  # 先停在固定目标外 4cm，再低速贴近
+  landmark_route_arrive_tol_cm: 4 # 固定目标预接近点的到达容差
   landmark_gap_min_cm: 1          # 最终车体与目标的允许最小间隙
   landmark_gap_max_cm: 2          # 最终车体与目标的允许最大间隙
   landmark_confirm_frames: 2      # 连续两拍满足间隙才确认到达
