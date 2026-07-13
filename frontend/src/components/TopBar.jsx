@@ -36,7 +36,7 @@ const MOON_ART = {
   endgame: '/assets/ui/moon/angry.png',
 }
 
-export default function TopBar({ rage = 0, tier = 'sleep', phase, turn, status, factions = [] }) {
+export default function TopBar({ rage = 0, tier = 'sleep', phase, turn, status, factions = [], currentPlayerId, onNextTurn }) {
   const rt = rageTier(rage)
   const statusColor = status === 'live' ? '#63C7C4' : status === 'mock' ? '#E9B44C' : '#8E9497'
   const statusLabel = status === 'live' ? '● LIVE' : status === 'mock' ? '○ MOCK' : '… 连接中'
@@ -100,62 +100,30 @@ export default function TopBar({ rage = 0, tier = 'sleep', phase, turn, status, 
           <div className="w-px h-8 bg-white/10" />
         </div>
 
-        {/* 中：月球狂暴度 */}
+        {/* 中：当前识别玩家 */}
         <div className="flex-1 mx-4">
           <div className="flex items-center gap-3">
-            <span className="text-[8px] font-mono text-muted whitespace-nowrap">月球狂暴度</span>
-            <span className="font-condensed text-2xl font-bold tabular-nums leading-none" style={{ color: rt.color }}>
-              {Math.round(rage)}
+            <span className="text-[8px] font-mono text-muted whitespace-nowrap">当前识别玩家</span>
+            <span className="font-condensed text-2xl font-bold tabular-nums leading-none" style={{ color: '#E9B44C' }}>
+              {(currentPlayerId || 'p1').toUpperCase()}
             </span>
-            <span className="text-[9px] font-mono font-semibold tracking-wider" style={{ color: rt.color }}>
-              {rt.en}
+            <span className="text-[9px] font-mono font-semibold tracking-wider" style={{ color: '#63C7C4' }}>
+              请扫描卡牌
             </span>
-            <div className="flex-1 h-[6px] bg-white/5 overflow-hidden relative">
-              <motion.div
-                className={`h-full ${rt.flash ? 'animate-flicker' : ''}`}
-                animate={{ width: `${Math.max(0, Math.min(100, rage))}%` }}
-                transition={{ type: 'spring', stiffness: 60, damping: 20 }}
-                style={{ background: rt.color }}
-              />
-              {/* 档位刻度线 */}
-              {[25, 50, 80].map((v) => (
-                <div
-                  key={v}
-                  className="absolute top-0 bottom-0 w-px bg-white/20"
-                  style={{ left: `${v}%` }}
-                />
-              ))}
-            </div>
+            <button type="button" className="debug-btn ml-auto" onClick={onNextTurn}>
+              下一回合
+            </button>
           </div>
 
-          {/* 心率压力贡献条 */}
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-[7px] font-mono text-muted/60 whitespace-nowrap">心率压力贡献</span>
-            <div className="flex-1 h-[3px] flex overflow-hidden">
-              {factions.map((f, i) => {
-                const pct = (stressValues[i] / totalStress) * 100
-                const fcolors = ['#63C7C4', '#E9B44C', '#7FB069', '#B08FC7']
-                return (
-                  <div
-                    key={f.id}
-                    className="h-full transition-all duration-500"
-                    style={{ width: `${pct}%`, background: fcolors[i] || '#8E9497' }}
-                  />
-                )
-              })}
+          <div className="mt-1 flex items-center gap-2">
+            <span className="text-[7px] font-mono text-muted/60 whitespace-nowrap">回合流程</span>
+            <div className="h-[3px] flex-1 overflow-hidden bg-white/5">
+              <div
+                className="h-full transition-all duration-300"
+                style={{ width: currentPlayerId === 'p2' ? '100%' : '50%', background: '#E9B44C' }}
+              />
             </div>
-            <div className="flex gap-1.5">
-              {factions.map((f, i) => {
-                const pct = Math.round((stressValues[i] / totalStress) * 100)
-                if (pct === 0) return null
-                const fcolors = ['#63C7C4', '#E9B44C', '#7FB069', '#B08FC7']
-                return (
-                  <span key={f.id} className="text-[7px] font-mono tabular-nums" style={{ color: fcolors[i] }}>
-                    {f.id.toUpperCase()}{pct}%
-                  </span>
-                )
-              })}
-            </div>
+            <span className="text-[7px] font-mono text-muted/60">A → B</span>
           </div>
         </div>
 

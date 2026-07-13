@@ -1,6 +1,7 @@
 .env
 .env.local
 *.db
+*.log
 backend/data/
 backend/logs/
 __pycache__/

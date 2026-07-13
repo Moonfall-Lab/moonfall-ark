@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGameData } from './lib/useGameData'
+import { HTTP_BASE } from './config'
 import Scene3D from './components/Scene3D'
 import TopBar from './components/TopBar'
 import MissionPanel from './components/MissionPanel'
@@ -9,6 +10,7 @@ import EventTimeline from './components/EventTimeline'
 import DangerOverlay from './components/DangerOverlay'
 import DebugPanel from './components/DebugPanel'
 import LoadingScreen from './components/LoadingScreen'
+import CameraPreview from './components/CameraPreview'
 
 export default function App() {
   const { config, state, events, status } = useGameData()
@@ -41,6 +43,10 @@ export default function App() {
   const factions = state.factions || []
   const units = state.units || []
   const unitOf = (fid) => units.find((u) => u.faction === fid)
+  const currentPlayerId = state.current_player_id || 'p1'
+  const nextTurn = () => {
+    fetch(`${HTTP_BASE}/api/control/next_turn`, { method: 'POST' }).catch(() => {})
+  }
 
   // 心率压力贡献
   const stressValues = factions.map((f) => Math.max(0, (f.vars?.heart_rate || 0) - 60))
@@ -60,6 +66,8 @@ export default function App() {
         turn={state.turn}
         status={status}
         factions={factions}
+        currentPlayerId={currentPlayerId}
+        onNextTurn={nextTurn}
       />
 
       {/* 主体区域：左任务 | 中地图 | 右事件 */}
@@ -108,6 +116,9 @@ export default function App() {
 
       {/* 终局遮罩 */}
       <AnimatePresence>{isEndgame && <DangerOverlay />}</AnimatePresence>
+
+      {/* 左下角二维码取景预览 */}
+      <CameraPreview playerId={currentPlayerId} />
 
       {/* 调试面板（Ctrl+D 触发，不展示给观众） */}
       {showDebug && <DebugPanel state={state} status={status} />}

@@ -128,14 +128,16 @@ async def _receiver(ws, fleet, pending: dict) -> None:
             pending.pop(rid, None)
             continue
         avoid = payload.get("avoid") or ()
-        if payload.get("landmark_id"):
+        target = None
+        if payload.get("x") is not None and payload.get("y") is not None:
+            target = (float(payload["x"]), float(payload["y"]))
+        if target is not None:
+            ok = rover.set_goal(target, avoid=avoid, speed=speed)
+        elif payload.get("landmark_id"):
             ok = rover.set_landmark_goal(
                 payload["landmark_id"], avoid=avoid, speed=speed)
         else:
-            target = None
-            if payload.get("x") is not None and payload.get("y") is not None:
-                target = (float(payload["x"]), float(payload["y"]))
-            elif payload.get("target_zone"):
+            if payload.get("target_zone"):
                 target = rover.zone_center_world(payload["target_zone"])
             if target is None:
                 print(f"[bridge] cmd.robot 无可解析目标: {payload}")

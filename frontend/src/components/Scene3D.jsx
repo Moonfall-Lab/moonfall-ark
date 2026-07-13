@@ -49,10 +49,52 @@ export default function Scene3D({ config, state, lastEvent, debug = false }) {
 
   const launchShip = (fid) => sceneRef.current?.launchShip(fid)
   const factions = config?.factions || []
+  const units = state?.units || []
+  const zones = state?.zones || []
+  const zoneConfigById = Object.fromEntries((config?.map?.zones || []).map((z) => [z.id, z]))
+  const stockZones = zones
+    .map((z) => ({ ...zoneConfigById[z.id], ...z }))
+    .filter((z) => z.kind === 'resource' || z.kind === 'relic')
 
   return (
     <div className="absolute inset-0">
       <div ref={holder} className="absolute inset-0" />
+      <div className="absolute left-3 top-3 z-20 w-[260px] border border-white/10 bg-black/70 p-2 font-mono text-[9px] text-lunar-white shadow-lg backdrop-blur">
+        <div className="mb-1 text-[8px] tracking-[0.18em] text-muted">ROVER TELEMETRY</div>
+        <div className="space-y-1">
+          {units.map((unit) => {
+            const pose = unit.pose || {}
+            const target = unit.target
+            return (
+              <div key={unit.id} className="border-l-2 border-white/20 pl-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold">{unit.id.toUpperCase()}</span>
+                  <span className="text-muted">{unit.status || 'idle'}</span>
+                </div>
+                <div className="text-muted">
+                  POS {Number(pose.x || 0).toFixed(2)}, {Number(pose.y || 0).toFixed(2)}
+                </div>
+                <div style={{ color: target ? '#E9B44C' : 'var(--muted-text)' }}>
+                  TGT {target ? `${target.name || target.landmark_id} · ${Number(target.x || 0).toFixed(2)}, ${Number(target.y || 0).toFixed(2)}` : 'none'}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      <div className="absolute right-3 top-3 z-20 w-[230px] border border-white/10 bg-black/70 p-2 font-mono text-[9px] text-lunar-white shadow-lg backdrop-blur">
+        <div className="mb-1 text-[8px] tracking-[0.18em] text-muted">FIELD STOCK</div>
+        <div className="space-y-1">
+          {stockZones.map((zone) => (
+            <div key={zone.id} className="flex items-center justify-between gap-2">
+              <span className="truncate">{zone.name || zone.id}</span>
+              <span style={{ color: zone.kind === 'relic' ? '#B08FC7' : '#E9B44C' }}>
+                {zone.kind === 'relic' ? `RELIC ${zone.relic_cards ?? 0}` : `FUEL ${zone.fuel_blocks ?? 0}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
       {armAlert && (
         <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 border border-red-500/40 bg-black/80 px-5 py-2 text-center shadow-lg">
           <div className="text-[10px] tracking-[0.28em] text-red-400">⚠ ARM STRIKE</div>

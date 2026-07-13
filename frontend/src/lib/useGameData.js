@@ -34,11 +34,15 @@ export function useGameData() {
       }
     }
 
-    // 静态配置：真实优先，失败回退 mock 配置
-    fetch(`${HTTP_BASE}/api/config`)
-      .then((r) => r.json())
-      .then((cfg) => !cancelled && setConfig(cfg))
-      .catch(() => !cancelled && setConfig((c) => c || MOCK_CONFIG))
+    // 页面重新打开时先重置后端内存状态，避免沿用上一次调试的小车位置。
+    fetch(`${HTTP_BASE}/api/control/reset`, { method: 'POST' })
+      .catch(() => {})
+      .finally(() => {
+        fetch(`${HTTP_BASE}/api/config`)
+          .then((r) => r.json())
+          .then((cfg) => !cancelled && setConfig(cfg))
+          .catch(() => !cancelled && setConfig((c) => c || MOCK_CONFIG))
+      })
 
     // 实时通道
     try {

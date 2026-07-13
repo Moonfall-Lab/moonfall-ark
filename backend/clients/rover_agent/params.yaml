@@ -22,8 +22,8 @@ robots:
   # car_id 与车顶 AprilTag id 固定一一对应：0→r0、1→r1、2→r2、3→r3。
   # theta_offset_deg：码没按"上边朝车头"贴时的方向补偿，
   # 在 viz 里看箭头与车头的夹角填写（车头偏箭头顺时针 90° 就填 -90）。
-  r0: { ip: "10.151.217.122", marker_id: 0, theta_offset_deg: 0 }
-  r1: { ip: "10.151.217.220", marker_id: 1, theta_offset_deg: 0 }
+  r0: { ip: "10.202.241.122", marker_id: 0, theta_offset_deg: 0 }
+  r1: { ip: "10.202.241.220", marker_id: 1, theta_offset_deg: 0 }
   # r2: { ip: "", marker_id: 2, theta_offset_deg: 0 }
   # r3: { ip: "", marker_id: 3, theta_offset_deg: 0 }
 
@@ -36,8 +36,14 @@ motion_models:
     right_turn_deg_s: 99.9
 
 # ── 固定目标（厘米；既参与绕行，也可作为车辆目的地）──
-# 开场用 setup_field 手动画入；临时绕行障碍只存在内存，不写入本文件。
-landmarks: []
+# 与 backend/moonfall_runtime/state.py 的场地建筑保持一致。
+# 临时绕行障碍只存在内存，不写入本文件。
+landmarks:
+  - { id: "obstacle-1", shape: "circle", x_cm: 19.22, y_cm: 52.58, radius_cm: 5.82 }
+  - { id: "obstacle-2", shape: "circle", x_cm: 61.51, y_cm: 51.09, radius_cm: 5.44 }
+  - { id: "obstacle-3", shape: "circle", x_cm: 37.37, y_cm: 29.88, radius_cm: 5.77 }
+  - { id: "obstacle-4", shape: "circle", x_cm: 12.71, y_cm: 10.16, radius_cm: 5.94 }
+  - { id: "obstacle-5", shape: "circle", x_cm: 61.83, y_cm: 13.90, radius_cm: 5.41 }
 
 vision:
   rate_hz: 15        # 检测频率上限

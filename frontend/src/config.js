@@ -2,7 +2,7 @@
 const params = new URLSearchParams(location.search)
 
 // 全局 mock 开关：true = 强制使用离线演示数据，不连后端
-export const NEED_MOCK = true
+export const NEED_MOCK = false
 
 export const HOST = params.get('host') || '127.0.0.1:8000'
 export const FORCE_MOCK = NEED_MOCK || params.has('mock')
